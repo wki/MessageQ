@@ -124,7 +124,7 @@ sub DEMOLISH {
     $self->broker->disconnect;
 }
 
-=head2 publish ( $queue, { ... } )
+=head2 publish ( $queue, \%data )
 
 publish a message (typically as hashref) onto a queue.
 
@@ -142,7 +142,7 @@ sub publish {
     );
 }
 
-=head2 ensure_queue_exists ( $queue [, { options }] )
+=head2 ensure_queue_exists ( $queue [, \%options ] )
 
 creates a queue if not yet existing
 
@@ -171,7 +171,7 @@ sub ensure_queue_exists {
     $self->_queues->{$queue_name} = 1;
 }
 
-=head2 consume ( $queue [, { options } ] )
+=head2 consume ( $queue [, \%options ] )
 
 start a consumer on the given queue. Valid options are:
 
