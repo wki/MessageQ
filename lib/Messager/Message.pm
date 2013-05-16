@@ -58,13 +58,10 @@ option C<<< no_ack => 0 >>> set.
 sub ack {
     my $self = shift;
     
-    warn "before ack";
     $self->broker->ack(
         $self->channel_nr,
         $self->raw_message->{delivery_tag},
     );
-    
-    warn "ack done";
 }
 
 __PACKAGE__->meta->make_immutable;
