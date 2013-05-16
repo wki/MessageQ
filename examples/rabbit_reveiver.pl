@@ -7,6 +7,9 @@ use lib "$FindBin::Bin/../lib";
 use Messager;
 use Data::Dumper;
 
+#
+# continuously receive messages.
+#
 my $m = Messager->new(user => 'worker', password => 'worker');
 
 $m->consume('proof', { no_ack => 0 });
