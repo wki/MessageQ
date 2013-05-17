@@ -4,15 +4,15 @@ use warnings;
 use 5.010;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
-use Messager;
+use MessageQ;
 use Data::Dumper;
 
 #
 # continuously receive messages.
 #
-my $m = Messager->new(user => 'worker', password => 'worker');
+my $m = MessageQ->new(user => 'worker', password => 'worker');
 
-$m->consume('proof', { no_ack => 0 });
+$m->consume('render', { no_ack => 0 });
 
 while (my $message = $m->recv) {
     say Data::Dumper->Dump([$message->data], ['received_data']);

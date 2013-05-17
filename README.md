@@ -1,11 +1,11 @@
-Simple Messager based on Net::RabbitMQ
+Simple MessageQ based on Net::RabbitMQ
 ======================================
 
 Sender:
 
-    use Messager;
+    use MessageQ;
     
-    my $m = Messager->new(
+    my $m = MessageQ->new(
         host     => 'localhost',
         user     => 'worker',
         password => 'worker',
@@ -15,9 +15,9 @@ Sender:
 
 Reveiver:
 
-    use Messager;
+    use MessageQ;
     
-    my $m = Messager->new(
+    my $m = MessageQ->new(
         host     => 'localhost',
         user     => 'worker',
         password => 'worker',

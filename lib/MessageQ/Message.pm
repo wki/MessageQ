@@ -1,4 +1,4 @@
-package Messager::Message;
+package MessageQ::Message;
 use 5.010;
 use Moose;
 use JSON::XS;
@@ -6,7 +6,7 @@ use namespace::autoclean;
 
 =head1 NAME
 
-Messager::Message - represents a message
+MessageQ::Message - represents a message
 
 =head1 SYNOPSIS
 
@@ -18,7 +18,7 @@ Messager::Message - represents a message
 
 has messager => (
     is       => 'ro',
-    isa      => 'Messager',
+    isa      => 'MessageQ',
     required => 1,
     handles  => [
         'broker',
@@ -59,6 +59,19 @@ sub ack {
     my $self = shift;
     
     $self->broker->ack(
+        $self->channel_nr,
+        $self->raw_message->{delivery_tag},
+    );
+}
+
+=head2 reject
+
+=cut
+
+sub reject {
+    my $self = shift;
+    
+    $self->broker->reject(
         $self->channel_nr,
         $self->raw_message->{delivery_tag},
     );

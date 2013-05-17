@@ -1,23 +1,25 @@
-package Messager;
+package MessageQ;
 use 5.010;
 use Moose;
 use JSON::XS;
 use Sys::Hostname;
 use Net::RabbitMQ;
-use Messager::Message;
+use MessageQ::Message;
 use namespace::autoclean;
+
+with 'MessageQ::Role::LoginAttributes';
 
 =head1 NAME
 
-Messager - simple message exchange using a RabbitMQ backend
+MessageQ - simple message exchange using a RabbitMQ backend
 
 =head1 SYNOPSIS
 
     # sender
     
-    use Messager;
+    use MessageQ;
     
-    my $m = Messager->new(
+    my $m = MessageQ->new(
         host     => 'localhost',
         user     => 'worker',
         password => 'worker',
@@ -28,9 +30,9 @@ Messager - simple message exchange using a RabbitMQ backend
 
     # reveiver:
     
-    use Messager;
+    use MessageQ;
     
-    my $m = Messager->new(
+    my $m = MessageQ->new(
         host     => 'localhost',
         user     => 'worker',
         password => 'worker',
@@ -47,24 +49,6 @@ Messager - simple message exchange using a RabbitMQ backend
 =head1 ATTRIBUTES
 
 =cut
-
-has host => (
-    is      => 'ro',
-    isa     => 'Str',
-    default => 'localhost',
-);
-
-has user => (
-    is      => 'ro',
-    isa     => 'Str',
-    default => 'guest',
-);
-
-has password => (
-    is      => 'ro',
-    isa     => 'Str',
-    default => 'guest',
-);
 
 has broker => (
     is         => 'ro',
@@ -120,11 +104,11 @@ has _queues => (
 
 sub DEMOLISH {
     my $self = shift;
-
+    
     $self->broker->disconnect;
 }
 
-=head2 publish ( $queue, \%data )
+=head2 publish ( $queue_name, \%data )
 
 publish a message (typically as hashref) onto a queue.
 
@@ -139,6 +123,26 @@ sub publish {
         $self->channel_nr,
         $queue_name,
         encode_json($data)
+    );
+}
+
+=head2 delegate ( $queue_name, $command, \%data )
+
+publishes a command for getting executed by a client. The command is assumed
+to be part of a package name for obtaining and instantiating an executable
+object at the remote side.
+
+=cut
+
+sub delegate {
+    my ($self, $queue_name, $command, $data) = @_;
+    
+    $self->publish(
+        $queue_name,
+        {
+            command => $command,
+            data    => $data,
+        }
     );
 }
 
@@ -223,7 +227,7 @@ sub recv {
     my $raw_message = $self->broker->recv
         or return;
 
-    return Messager::Message->new(
+    return MessageQ::Message->new(
         messager    => $self,
         raw_message => $raw_message,
     );

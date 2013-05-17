@@ -2,7 +2,8 @@ use strict;
 use warnings;
 use Test::More;
 
-use ok 'Messager';
-use ok 'Messager::Message';
+use ok 'MessageQ';
+use ok 'MessageQ::Message';
+use ok 'MessageQ::Worker';
 
 done_testing;
