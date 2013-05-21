@@ -108,21 +108,31 @@ sub DEMOLISH {
     $self->broker->disconnect;
 }
 
-=head2 publish ( $queue_name, \%data )
+=head2 publish ( $routing_key, \%data [ , \%options [ , \%props ] ] )
 
-publish a message (typically as hashref) onto a queue.
+publish a message (typically as hashref). Options and props are the same
+as Net::RabbitMQ's args. If no $options->{exchange} key is given, or the
+value is 'amq.direct' or empty, a queue with the name of the $routing_key
+is created unless already existing.
 
 =cut
 
 sub publish {
-    my ($self, $queue_name, $data) = @_;
+    my $self        = shift;
+    my $routing_key = shift;
+    my $data        = shift;
+    my $options     = shift // {};
+    my $props       = shift // {};
 
-    $self->ensure_queue_exists($queue_name);
+    if (!exists $options->{exchange} || ($options->{exchange} // 'amq.direct') eq 'amq.direct') {
+        $self->ensure_queue_exists($routing_key);
+    }
 
     $self->broker->publish(
         $self->channel_nr,
-        $queue_name,
-        encode_json($data)
+        $routing_key,
+        encode_json($data),
+        $options, $props
     );
 }
 
@@ -158,7 +168,7 @@ sub ensure_queue_exists {
     my %options = (
         passive     => 0,
         durable     => 1,
-        auto_delete => 1,
+        auto_delete => 0,
         exclusive   => 0,
 
         ref $_[0] eq 'HASH' ? %{$_[0]} : @_

@@ -1,0 +1,20 @@
+sample definition for some queues usable for examples below.
+
+Users:
+    guest (admin)
+    worker
+
+Exchanges:
+    render
+
+Queues:
+    render
+    me-render
+
+To upload:
+    sudo rabbitmqctl stop_app
+    sudo rabbitmqctl reset
+    sudo rabbitmqctl start_app
+    
+    curl -X POST -F file=@definitions.js http://guest:guest@localhost:15672/api/definitions
+
