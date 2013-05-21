@@ -28,6 +28,16 @@
         "read": ".*"
     }],
     "queues": [{
+        "name": "delay",
+        "vhost": "/",
+        "durable": true,
+        "auto_delete": false,
+        "arguments": {
+            "x-message-ttl": 2000,
+            "x-dead-letter-exchange": "render",
+            "x-dead-letter-routing-key": "delayed.render"
+        }
+    }, {
         "name": "me-render",
         "vhost": "/",
         "durable": true,
@@ -48,8 +58,23 @@
         "auto_delete": false,
         "internal": false,
         "arguments": {}
+    }, {
+        "name": "delay",
+        "vhost": "/",
+        "type": "topic",
+        "durable": true,
+        "auto_delete": false,
+        "internal": false,
+        "arguments": {}
     }],
     "bindings": [{
+        "source": "delay",
+        "vhost": "/",
+        "destination": "delay",
+        "destination_type": "queue",
+        "routing_key": "#",
+        "arguments": {}
+    }, {
         "source": "render",
         "vhost": "/",
         "destination": "me-render",
