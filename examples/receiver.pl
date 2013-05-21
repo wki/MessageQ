@@ -17,7 +17,7 @@ $m->consume($queue, { no_ack => 0 });
 
 say "[*] listening for messages on '$queue'...";
 
-while (my $message = $m->recv) {
+while (my $message = $m->re cv) {
     say Data::Dumper->Dump([$message->data], ['received_data']);
 
     # if we had consume('proof', { no_ack => 0 }), we need:
