@@ -22,7 +22,6 @@ has messager => (
     required => 1,
     handles  => [
         'broker',
-        'channel_nr',
     ],
 );
 
@@ -59,7 +58,6 @@ sub ack {
     my $self = shift;
     
     $self->broker->ack(
-        $self->channel_nr,
         $self->raw_message->{delivery_tag},
     );
 }
