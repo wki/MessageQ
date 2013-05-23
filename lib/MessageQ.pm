@@ -6,7 +6,7 @@ use Sys::Hostname;
 use File::ShareDir ':ALL';
 use Path::Class;
 use Try::Tiny;
-use MessageQ::RabbitMQ;
+use Net::RabbitMQ::PP;
 use MessageQ::Message;
 use namespace::autoclean;
 
@@ -53,26 +53,26 @@ MessageQ - simple message exchange using a RabbitMQ backend
 
 =cut
 
-has amqp_definition => (
-    is         => 'ro',
-    isa        => 'Str',
-    lazy_build => 1,
-);
-
-sub _build_amqp_definition {
-    my $self;
-    
-    my $dist_dir;
-    try {
-        $dist_dir = dir(dist_dir('MessageQ'));
-    } catch {
-        $dist_dir = file(__FILE__)->absolute->dir->parent->subdir('share');
-    };
-    
-    # warn "DIST dir = '$dist_dir'";
-    
-    return $dist_dir->file('amqp0-9-1.xml')->stringify;
-}
+# has amqp_definition => (
+#     is         => 'ro',
+#     isa        => 'Str',
+#     lazy_build => 1,
+# );
+# 
+# sub _build_amqp_definition {
+#     my $self;
+#     
+#     my $dist_dir;
+#     try {
+#         $dist_dir = dir(dist_dir('MessageQ'));
+#     } catch {
+#         $dist_dir = file(__FILE__)->absolute->dir->parent->subdir('share');
+#     };
+#     
+#     # warn "DIST dir = '$dist_dir'";
+#     
+#     return $dist_dir->file('amqp0-9-1.xml')->stringify;
+# }
 
 has broker => (
     is         => 'ro',
@@ -83,18 +83,15 @@ has broker => (
 sub _build_broker {
     my $self = shift;
 
-    my $broker = MessageQ::RabbitMQ->new(
-        server          => $self->host,
-        amqp_definition => $self->amqp_definition,
-      # debug           => 1,
-    );
-    
-    $broker->connect(
-        login    => $self->user,
+    my $broker = Net::RabbitMQ::PP->new(
+        host     => $self->host,
+        user     => $self->user,
         password => $self->password,
+        debug    => 1,
     );
-    
-    $broker->open_channel;
+
+    $broker->connect;
+    # $broker->open_channel;
 
     return $broker;
 }
