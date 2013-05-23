@@ -6,6 +6,52 @@ use Net::RabbitMQ::PP::Channel;
 use Try::Tiny;
 use namespace::autoclean;
 
+=head1 NAME
+
+Net::RabbitMQ::PP - a pure perl RabbitMQ binding
+
+=head1 SYNOPSIS
+
+    use Net::RabbitMQ::PP;
+    
+    my $broker = Net::RabbitMQ::PP->new;
+    my $channel = $broker->open_channel(1);
+    
+    # TODO: work with exchanges
+    my $exchange = $broker->exchange('xxx');
+    #### MORE
+    
+    # TODO: work with queues
+    my $queue = $broker->queue('xxx');
+    #### MORE
+    
+    # a producer
+    $channel->publish(
+        exchange    => 'send_mail',
+        routing_key => 'foo.bar',
+        data        => 'Dear Reader, ...',
+    );
+    
+    # a consumer
+    $channel->consume(queue => 'send_mail', no_ack => 0);
+    while (my $message = $channel->receive) {
+        say 'received:', $message->body;
+        
+        $message->ack;
+    }
+
+=head1 DESCRIPTION
+
+TODO: write something
+
+=head1 ATTRIBUTES
+
+=cut
+
+=head1 ATTRIBUTES
+
+=cut
+
 has host => (
     is      => 'ro',
     isa     => 'Str',
@@ -151,6 +197,10 @@ sub ensure_connected {
     
     $self->connect if !$self->is_connected;
 }
+
+before [qw(
+    open_channel
+)] => sub { $_[0]->ensure_connected };
 
 =head2 disconnect
 

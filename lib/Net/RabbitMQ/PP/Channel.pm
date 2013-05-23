@@ -1,22 +1,10 @@
 package Net::RabbitMQ::PP::Channel;
 use Moose;
 use Data::Dumper;
+use Net::RabbitMQ::PP::Message;
 use namespace::autoclean;
 
-has frame_io => (
-    is       => 'ro',
-    isa      => 'Net::RabbitMQ::PP::FrameIO',
-    required => 1,
-    weak_ref => 1,
-    handles  => {
-        write_frame    => 'write',
-        write_greeting => 'write_greeting',
-        write_header   => 'write_header',
-        write_body     => 'write_body',
-        read_frame     => 'read',
-        next_frame_is  => 'next_frame_is',
-    }
-);
+with 'Net::RabbitMQ::PP::Role::FrameIO';
 
 has channel => (
     is       => 'ro',
@@ -126,12 +114,14 @@ sub _read_response {
         $body .= $frame->payload;
     }
     
-    return {
+    return Net::RabbitMQ::PP::Message->new(
+        channel        => $self->channel,
+        frame_io       => $self->frame_io,
         body           => $body,
         delivery_tag   => $deliver->method_frame->delivery_tag,
         reply_to       => $header->header_frame->headers->{reply_to},
         correlation_id => $header->header_frame->headers->{correlation_id},
-    };
+    );
 }
 
 =head2 consume ( queue => 'queue', ... )
@@ -181,24 +171,6 @@ sub receive {
         if !$self->is_consuming;
 
     return $self->_read_response;
-}
-
-=head2 ack
-
-Ack a received message
-
-=cut
-
-sub ack {
-    my $self = shift;
-    my %args = @_;
-    
-    $self->write_frame(
-        $self->channel,
-        'Basic::Ack',
-        multiple => 0,
-        %args
-    );
 }
 
 __PACKAGE__->meta->make_immutable;
