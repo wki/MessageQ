@@ -16,13 +16,10 @@ MessageQ::Message - represents a message
 
 =cut
 
-has messager => (
+has channel => (
     is       => 'ro',
-    isa      => 'MessageQ',
+    isa      => 'Object',
     required => 1,
-    handles  => [
-        'broker',
-    ],
 );
 
 has raw_message => (
@@ -57,8 +54,8 @@ option C<<< no_ack => 0 >>> set.
 sub ack {
     my $self = shift;
     
-    $self->broker->ack(
-        $self->raw_message->{delivery_tag},
+    $self->channel->ack(
+        delivery_tag => $self->raw_message->{delivery_tag},
     );
 }
 
@@ -69,8 +66,7 @@ sub ack {
 sub reject {
     my $self = shift;
     
-    $self->broker->reject(
-        $self->channel_nr,
+    $self->channel->reject(
         $self->raw_message->{delivery_tag},
     );
 }

@@ -28,12 +28,6 @@ has socket => (
     lazy_build => 1,
 );
 
-has debug => (
-    is      => 'ro',
-    isa     => 'Bool',
-    default => 0,
-);
-
 sub _build_socket {
     my $self = shift;
 

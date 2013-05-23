@@ -19,7 +19,7 @@ has network => (
 
 has debug => (
     is      => 'ro',
-    isa     => 'Bool',
+    isa     => 'Int',
     default => 0,
 );
 
@@ -31,16 +31,31 @@ has _pre_read_data => (
 
 ### FIXME: conceptionally wrong. read frames are associated to a channel.
 has _cached_frames => (
-    traits  => ['Array'],
     is      => 'rw',
-    isa     => 'ArrayRef',
-    default => sub { [] },
-    handles => {
-        cache_frame       => 'push',
-        get_cached_frame  => 'shift',
-        has_cached_frames => 'count',
-    },
+    isa     => 'HashRef',
+    default => sub { +{} },
 );
+
+sub cache_frame {
+    my $self    = shift;
+    my $channel = shift;
+    
+    push @{$self->_cached_frames->{$channel}}, @_;
+}
+
+sub has_cached_frames {
+    my $self    = shift;
+    my $channel = shift;
+    
+    return scalar @{$self->_cached_frames->{$channel} //= []};
+}
+
+sub get_cached_frame {
+    my $self    = shift;
+    my $channel = shift;
+    
+    return shift @{$self->_cached_frames->{$channel}};
+}
 
 sub BUILD {
     my $self = shift;
@@ -65,11 +80,12 @@ sub BUILD {
 
 sub print_debug {
     my $self = shift;
+    my $level = shift;
 
-    say @_ if $self->debug;
+    say @_ if $self->debug >= $level;
 }
 
-=head2 write ( [ $channel , ] $frame_type [, %args ] )
+=head2 write ( $channel, $frame_type [, %args ] )
 
 construct and write a frame
 
@@ -82,20 +98,17 @@ construct and write a frame
 
 sub write {
     my $self       = shift;
-    my $channel    = $_[0] =~ m{\A \d+ \z}xms ? shift : 1;
+    my $channel    = shift;
     my $frame_type = shift;
 
     my $frame = "Net::AMQP::Protocol::$frame_type"->new(@_);
-    warn "FRAME: $frame";
 
-    ### TODO: what is the meaning of this?
+    # what is the meaning of this?
     if ($frame->isa('Net::AMQP::Protocol::Base')) {
         $frame = $frame->frame_wrap;
     }
 
     $frame->channel($channel);
-    $self->print_debug('Writing frame: ' . Dumper $frame);
-
     $self->_write_frame($frame);
 }
 
@@ -103,7 +116,12 @@ sub _write_frame {
     my $self  = shift;
     my $frame = shift;
 
-    $self->print_debug('Writing Frame:', ref $frame); #->type_string);
+    $self->print_debug(1, 'Writing Frame:',
+        $frame->can('method_frame')
+            ? ref $frame->method_frame
+            : ref $frame
+        );
+    $self->print_debug(2, 'Frame:', Dumper $frame);
     $self->network->write($frame->to_raw_frame);
 }
 
@@ -119,19 +137,22 @@ sub write_greeting {
     $self->network->write(Net::AMQP::Protocol->header);
 }
 
-=head2 write_header
+=head2 write_header ( $channel, $frame)
 
 write a header frame
 
 =cut
 
 sub write_header {
-    my $self = shift;
-    my %args = @_;
+    my $self    = shift;
+    my $channel = shift;
+    my %args    = @_;
 
+    my $body_size = delete $args{body_size} // 0;
+    
     my $header = Net::AMQP::Frame::Header->new(
         weight       => 0,
-        body_size    => $args{body_size} // 0,
+        body_size    => $body_size,
         header_frame => Net::AMQP::Protocol::Basic::ContentHeader->new(
             content_type     => 'application/octet-stream',
             content_encoding => undef,
@@ -150,6 +171,7 @@ sub write_header {
         ),
     );
 
+    $header->channel($channel);
     $self->_write_frame($header);
 }
 
@@ -161,12 +183,15 @@ write a body frame with some payload
 
 sub write_body {
     my $self    = shift;
+    my $channel = shift;
     my $payload = shift;
 
-    $self->_write_frame(Net::AMQP::Frame::Body->new(payload => $payload));
+    my $body = Net::AMQP::Frame::Body->new(payload => $payload);
+    $body->channel($channel);
+    $self->_write_frame($body);
 }
 
-=head2 read ( [ $channel , ] [ $expected_frame_type ] )
+=head2 read ( $channel [ , $expected_frame_type ] )
 
 read a frame optionally expecting a certain type
 
@@ -174,13 +199,13 @@ read a frame optionally expecting a certain type
 
 sub read {
     my $self                = shift;
-    my $channel             = $_[0] =~ m{\A \d+ \z}xms ? shift : 1;
+    my $channel             = shift;
     my $expected_frame_type = shift;
 
-    $self->_read_frames_into_cache;
+    $self->_read_frames_into_cache($channel);
 
-    my $frame = $self->get_cached_frame
-        or die 'Could not read a frame - cache is empty';
+    my $frame = $self->get_cached_frame($channel)
+        or die "Could not read a frame - cache ($channel) is empty";
 
     if ($expected_frame_type) {
         if (!$self->frame_is($frame, $expected_frame_type)) {
@@ -195,16 +220,24 @@ sub read {
 }
 
 sub _read_frames_into_cache {
-    my $self = shift;
+    my $self    = shift;
+    my $channel = shift;
 
-    return if $self->has_cached_frames;
+    return if $self->has_cached_frames($channel);
 
     my $data = $self->_read_data;
     my @frames = Net::AMQP->parse_raw_frames(\$data);
 
-    $self->print_debug("Caching Frame (${\$_->channel}):", $_->type_string) for @frames;
+    foreach my $frame (@frames) {
+        $self->print_debug(1, "Caching Frame (${\$frame->channel}):",
+            $frame->can('method_frame')
+                ? ref $frame->method_frame
+                : ref $frame
+        );
+        $self->print_debug(2, "Frame:", Dumper $frame);
+    }
 
-    $self->cache_frame(@frames);
+    $self->cache_frame($_->channel, $_) for @frames;
 }
 
 =head2 next_frame_is
@@ -215,14 +248,15 @@ checks next frame against a type and returns a boolean reflecting the type check
 
 sub next_frame_is {
     my $self = shift;
+    my $channel = shift;
     my $expected_frame_type = shift
         or return 1;
 
-    $self->_read_frames_into_cache;
+    $self->_read_frames_into_cache($channel);
 
-    return 0 if !$self->has_cached_frames;
+    return 0 if !$self->has_cached_frames($channel);
 
-    return $self->frame_is($self->_cached_frames->[0], $expected_frame_type);
+    return $self->frame_is($self->_cached_frames->{$channel}->[0], $expected_frame_type);
 }
 
 sub frame_is {
@@ -235,7 +269,7 @@ sub frame_is {
         ? ref $frame->method_frame
         : ref $frame;
 
-    $self->print_debug("testing '$got' against '$expected_frame_type'...");
+    $self->print_debug(2, "testing '$got' against '$expected_frame_type'...");
 
     return $got =~ m{\Q$expected_frame_type\E \z}xms;
 }

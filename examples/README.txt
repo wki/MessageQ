@@ -23,7 +23,6 @@ Net::RabbitMQ::PP::Tx
 Net::RabbitMQ::PP -- High layer: talk with RabbitMQ
  - network, frame_io --- lower layers
  - host, port, timeout, vhost, user, password
- - amqp_definition
  - channel -- defaults to "1" unless set
  - connect() --- happens implicitly
  

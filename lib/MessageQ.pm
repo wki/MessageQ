@@ -91,37 +91,21 @@ sub _build_broker {
     );
 
     $broker->connect;
-    # $broker->open_channel;
 
     return $broker;
 }
 
-# has channel_nr => (
-#     is         => 'ro',
-#     isa        => 'Int',
-#     lazy_build => 1,
-#     init_arg   => undef,
-# );
-# 
-# sub _build_channel_nr {
-#     my $self = shift;
-#     state $channel_nr = 0;
-# 
-#     ++$channel_nr;
-#     $self->broker->channel_open($channel_nr);
-# 
-#     return $channel_nr;
-# }
+has channel => (
+    is => 'ro',
+    isa => 'Object',
+    lazy_build => 1,
+);
 
-# has _queues => (
-#     traits  => ['Hash'],
-#     is      => 'ro',
-#     isa     => 'HashRef',
-#     default => sub { {} },
-#     handles => {
-#         has_queue => 'exists',
-#     }
-# );
+sub _build_channel {
+    my $self = shift;
+    
+    return $self->broker->open_channel(1);
+}
 
 =head1 METHODS
 
@@ -142,14 +126,13 @@ sub publish {
     my $exchange    = shift;
     my $routing_key = shift;
     my $data        = shift;
-    my $options     = shift // {};
-    my $props       = shift // {};
+    my %options     = @_;
 
-    $self->broker->publish(
-        $exchange,
-        $routing_key,
-        encode_json($data),
-        $options, $props
+    $self->channel->publish(
+        exchange => $exchange,
+        routing_key => $routing_key,
+        data => encode_json($data),
+        %options
     );
 }
 
@@ -234,8 +217,8 @@ sub consume {
 
     # $self->ensure_queue_exists($queue_name);
 
-    $self->broker->consume(
-        $queue_name,
+    $self->channel->consume(
+        queue => $queue_name,
         %options
     );
 }
@@ -251,7 +234,7 @@ sub receive {
     my $self = shift;
     my $timeout = shift // 0;
 
-    my $raw_message = $self->broker->receive($timeout);
+    my $raw_message = $self->channel->receive;
     
     if (!$raw_message) {
         warn 'receive: timeout reached...';
@@ -259,7 +242,7 @@ sub receive {
     }
 
     return MessageQ::Message->new(
-        messager    => $self,
+        channel     => $self->channel,
         raw_message => $raw_message,
     );
 }
