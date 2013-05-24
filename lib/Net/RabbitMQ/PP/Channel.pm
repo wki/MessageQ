@@ -66,16 +66,6 @@ Get a message from $queue. Return a hashref with the message details, or undef
 if there is no message. This is essentially a poll of a given queue. %params is
 an optional hash containing parameters to the Get request.
 
-The message returned in a hashref with the following keys:
-
-* body - the body of the message
-
-* reply_to - the reply_to header of the message
-
-* correlation_id - the correlation_id of the message
-
-* delivery_tag - used in acking messages.
-
 =cut
 
 sub get {

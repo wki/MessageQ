@@ -9,11 +9,9 @@ use Try::Tiny;
 use Data::Dumper;
 use namespace::autoclean;
 
-### must have amqp_definition
-
 has network => (
     is       => 'ro',
-    isa      => 'Net::RabbitMQ::PP::Network',
+    isa      => 'Object', # typically ::Network
     required => 1,
 );
 
@@ -29,8 +27,8 @@ has _pre_read_data => (
     default => '',
 );
 
-### FIXME: conceptionally wrong. read frames are associated to a channel.
-has _cached_frames => (
+# { channel => [ ... ], ... }
+has _cached_frames_for_channel => (
     is      => 'rw',
     isa     => 'HashRef',
     default => sub { +{} },
@@ -40,21 +38,21 @@ sub cache_frame {
     my $self    = shift;
     my $channel = shift;
     
-    push @{$self->_cached_frames->{$channel}}, @_;
+    push @{$self->_cached_frames_for_channel->{$channel}}, @_;
 }
 
 sub has_cached_frames {
     my $self    = shift;
     my $channel = shift;
     
-    return scalar @{$self->_cached_frames->{$channel} //= []};
+    return scalar @{$self->_cached_frames_for_channel->{$channel} //= []};
 }
 
 sub get_cached_frame {
     my $self    = shift;
     my $channel = shift;
     
-    return shift @{$self->_cached_frames->{$channel}};
+    return shift @{$self->_cached_frames_for_channel->{$channel}};
 }
 
 sub BUILD {
@@ -256,7 +254,7 @@ sub next_frame_is {
 
     return 0 if !$self->has_cached_frames($channel);
 
-    return $self->frame_is($self->_cached_frames->{$channel}->[0], $expected_frame_type);
+    return $self->frame_is($self->_cached_frames_for_channel->{$channel}->[0], $expected_frame_type);
 }
 
 sub frame_is {
@@ -274,99 +272,10 @@ sub frame_is {
     return $got =~ m{\Q$expected_frame_type\E \z}xms;
 }
 
-# unused
-# sub _assert_frame_is {
-#     my $self = shift;
-#     my $frame = shift;
-#     my $expected_class = shift;
-#
-#     die "Expected $expected_class but got a non-blessed scalar!\nFrame Dump:" . Dumper $frame
-#         unless blessed $frame;
-#
-#     if (! $frame->can('method_frame')) {
-#         die "Exepected $expected_class, but got " . ref($frame) . "\nFrame Dump:" . Dumper $frame;
-#     }
-#
-#     if (! $frame->method_frame->isa($expected_class)) {
-#         if (! $frame->method_frame->can('reply_text')) {
-#             die "Exepected $expected_class, but got " . ref($frame->method_frame) . "\nFrame Dump:" . Dumper $frame;
-#         }
-#         die $frame->method_frame->reply_text . "\n";
-#     }
-# }
 
-# unused
-# sub _read_frame {
-#     my $self = shift;
-#
-#     my $data = $self->_read_data($timeout);
-#
-#     return unless $data;
-#
-#     my @frames = Net::AMQP->parse_raw_frames(\$data);
-#
-#     # # $self->_debug("Read frames: " . Dumper \@frames);
-#     # # $self->_debug("Raw data: $data") if ! @frames;
-#     #
-#     # @frames = $self->_strip_receive_frames($timeout, $expecting_receive, @frames);
-#     #
-#     # if (length($data) > 0 && ! @frames) {
-#     #     die "Read " . length($data) . " bytes of data, but it contained no parsable frames\n";
-#     # }
-#     #
-#     # return @frames;
-# }
-
-# Strip out any receive frames, and add them to the cache
-# sub _strip_receive_frames {
-#     my $self = shift;
-#     my $timeout = shift;
-#     my $expecting_receive = shift;
-#     my $frame = shift;
-#
-#     # Only do something if we're consuming
-#     return $frame unless $self->{consuming};
-#
-#     my @messages;
-#
-#     my @other_frames;
-#
-#     while (1) {
-#         my $deliver = $frame;
-#
-#         try {
-#             $self->_assert_frame_is($deliver, 'Net::AMQP::Protocol::Basic::Deliver');
-#         }
-#         catch {
-#             undef $deliver;
-#         };
-#
-#         last unless $deliver;
-#
-#         my ($header, @bodies) = $self->_read_resp();
-#
-#         push @messages, {
-#             deliver => $deliver,
-#             header => $header,
-#             bodies => \@bodies
-#         };
-#
-#         # See if there's a new frame to read, unless we were
-#         #  expecting a receive, in which case there may not be anything
-#         #  more.
-#         if ($expecting_receive) {
-#             last;
-#         }
-#         else {
-#             ($frame) = $self->_read_frames($timeout);
-#         }
-#     }
-#
-#     $self->receive_cache_push(@messages);
-#
-#     return $frame;
-# }
-
+# Header: 7 Bytes:  tt cc cc ss ss ss ss     type, channel, size
+# Body:   s Bytes
+# Footer: 1 Byte    0xce
 
 # read raw data, keep superfluous data in _pre_read_data,
 # return data for one frame
