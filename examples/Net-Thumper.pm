@@ -296,7 +296,7 @@ sub declare_queue {
         %args,
         queue       => $queue,
         ticket      => 0,
-        nowait      => 0,
+        no_wait     => 0,
     );
     
     $self->_write_frame($declare_queue);
@@ -331,7 +331,7 @@ sub bind_queue {
         exchange    => $exchange,
         routing_key => $routing_key,
         ticket      => 0,
-        nowait      => 0,
+        no_wait     => 0,
     );
     
     $self->_write_frame($declare_queue);
@@ -367,7 +367,7 @@ sub declare_exchange {
         internal    => 0,
         %args,        
         ticket      => 0,
-        nowait      => 0,
+        no_wait     => 0,
     );
     
     $self->_write_frame($declare_queue);
@@ -518,7 +518,7 @@ sub consume {
         queue => $queue,
         %args, # queue
         ticket       => 0,
-        nowait       => 0,
+        no_wait      => 0,
     );
     
     $self->_write_frame($consume);
@@ -625,7 +625,7 @@ sub cancel {
     my $consume = Net::AMQP::Protocol::Basic::Cancel->new(
         consumer_tag => $consumer_tag,
         %args,
-        nowait       => 0,
+        no_wait      => 0,
     );
     
     $self->_write_frame($consume);

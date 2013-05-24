@@ -6,6 +6,10 @@ use Net::RabbitMQ::PP::Channel;
 use Try::Tiny;
 use namespace::autoclean;
 
+with 'Net::RabbitMQ::PP::Role::FrameIO';
+
+# cat share/amqp0-9-1.xml  | egrep '<(class|method|field)' | less
+
 =head1 NAME
 
 Net::RabbitMQ::PP - a pure perl RabbitMQ binding
@@ -117,20 +121,7 @@ sub _build_network {
     );
 }
 
-has frame_io => (
-    is => 'ro',
-    isa => 'Net::RabbitMQ::PP::FrameIO',
-    lazy_build => 1,
-    handles => {
-        write_frame    => 'write',
-        write_greeting => 'write_greeting',
-        write_header   => 'write_header',
-        write_body     => 'write_body',
-        read_frame     => 'read',
-        next_frame_is  => 'next_frame_is',
-    }
-);
-
+# frame_io defined by role above
 sub _build_frame_io {
     my $self = shift;
     
@@ -224,6 +215,9 @@ sub disconnect {
 
 =head2 open_channel ( $nr )
 
+### TODO: channel(x) ---> liefert (gecachtes) Channel Object. Macht Sinn?
+### $x->channel(2)->publish(...);
+
 =cut
 
 sub open_channel {
@@ -240,15 +234,20 @@ sub open_channel {
     );
 }
 
-# - exchange('name') --> returns ::Exchange instance
-# - queue('name') --> returns ::Queue instance
+### TODO: kein Reply abfragen wenn no-wait mit angegeben ist...
 
-# - qos()
-# - cancel()
-# - return()
-# - deliver()
-# - reject()
-# - recover()
+### TODO: add these:
+
+# - exchange('name') --> returns ::Exchange instance
+#   exchange('name').declare(durable, type, passive, durable, no-wait, arguments);
+#   exchange('name').delete(if-unused, no-wait);
+#
+# - queue('name') --> returns ::Queue instance, allows querying message-count, consumer-count
+#   queue('name').declare(durable, passive, exclusive, auto-delete, no-wait, arguments);
+#   queue('name').bind(exchange, routing-key, no-wait, arguments);
+#   queue('name').unbind(exchange, routing-key, arguments);
+#   queue('name').purge(no-wait);
+#   queue('name').delete(if-unused, if-empty, no-wait);
 
 __PACKAGE__->meta->make_immutable;
 1;

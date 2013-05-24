@@ -6,6 +6,8 @@ use namespace::autoclean;
 
 with 'Net::RabbitMQ::PP::Role::FrameIO';
 
+### TODO: instead of frame_io: have a 'broker' attr, responding to all frame_io methods
+
 has channel => (
     is       => 'ro',
     isa      => 'Int',
@@ -146,7 +148,7 @@ sub consume {
         no_ack       => 1,
         exclusive    => 0,
         ticket       => 0,
-        nowait       => 0,
+        no_wait      => 0,
         %args,
     );
     my $consume_ok = $self->read_frame($self->channel, 'Basic::ConsumeOk');
@@ -172,6 +174,59 @@ sub receive {
 
     return $self->_read_response;
 }
+
+=head2 qos
+
+specify quality of service
+
+=cut
+
+sub qos {
+    my $self = shift;
+    my %args = @_;
+    
+    $self->write_frame(
+        $self->channel,
+        'Basic::Qos',
+        prefetch_size  => '',
+        prefetch_count => 0,
+        global         => 1,
+        %args,
+    );
+    $self->read_frame($self->channel, 'Basic::QosOk');
+}
+
+=head2 cancel
+
+cancel a consumer
+
+=cut
+
+sub cancel {
+    my $self = shift;
+    my %args = @_;
+    
+    $self->write_frame(
+        $self->channel,
+        'Basic::Cancel',
+        consumer_tag => '',
+        no_wait      => 0,
+        %args,
+    );
+    $self->read_frame($self->channel, 'Basic::CancelOk');
+
+    $self->is_consuming(0);
+}
+
+# TODO: flow(active)
+# TODO: close(reply-code, reply-text, class-id, method-id)
+
+
+### ASYNC Model?
+# - return(reply-code, reply-text, exchange, routing-key) -- returns an undeliverable message
+# - deliver(consumer-tag, delivery-tag, redelivered, exchange, routing-key) -- 
+# - reject(delivery-tag, requeue)
+# - recover(requeue)
 
 __PACKAGE__->meta->make_immutable;
 1;

@@ -4,6 +4,8 @@ use namespace::autoclean;
 
 with 'Net::RabbitMQ::PP::Role::FrameIO';
 
+### TODO: instead of frame_io: have a 'broker' attr, responding to all frame_io methods
+
 has channel => (
     is       => 'ro',
     isa      => 'Int',
