@@ -19,7 +19,6 @@ Net::RabbitMQ::PP - a pure perl RabbitMQ binding
     use Net::RabbitMQ::PP;
     
     my $broker = Net::RabbitMQ::PP->new;
-    my $channel = $broker->open_channel(1);
     
     # TODO: work with exchanges
     my $exchange = $broker->exchange('xxx');
@@ -28,6 +27,9 @@ Net::RabbitMQ::PP - a pure perl RabbitMQ binding
     # TODO: work with queues
     my $queue = $broker->queue('xxx');
     #### MORE
+    
+    # open a channel for further operations
+    my $channel = $broker->open_channel(1);
     
     # a producer
     $channel->publish(

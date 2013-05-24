@@ -221,21 +221,23 @@ sub _read_frames_into_cache {
     my $self    = shift;
     my $channel = shift;
 
-    return if $self->has_cached_frames($channel);
+    ### Could this be harmful?
+    # return if $self->has_cached_frames($channel);
 
-    my $data = $self->_read_data;
-    my @frames = Net::AMQP->parse_raw_frames(\$data);
-
-    foreach my $frame (@frames) {
-        $self->print_debug(1, "Caching Frame (${\$frame->channel}):",
-            $frame->can('method_frame')
-                ? ref $frame->method_frame
-                : ref $frame
-        );
-        $self->print_debug(2, "Frame:", Dumper $frame);
+    while (my $data = $self->_read_data) {
+        my @frames = Net::AMQP->parse_raw_frames(\$data);
+        
+        foreach my $frame (@frames) {
+            $self->print_debug(1, "Caching Frame (${\$frame->channel}):",
+                $frame->can('method_frame')
+                    ? ref $frame->method_frame
+                    : ref $frame
+            );
+            $self->print_debug(2, "Frame:", Dumper $frame);
+        }
+        
+        $self->cache_frame($_->channel, $_) for @frames;
     }
-
-    $self->cache_frame($_->channel, $_) for @frames;
 }
 
 =head2 next_frame_is

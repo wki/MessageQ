@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Test::Exception;
 
 use ok 'Net::RabbitMQ::PP::FrameIO';
 
@@ -22,7 +23,7 @@ note 'raw packet input';
     is length $TestNetwork::read_buffer, 0, 'read buffer is empty';
 }
 
-note 'packet decoding';
+note 'packet decoding and reading';
 {
     my $f = frameio();
     
@@ -35,9 +36,52 @@ note 'packet decoding';
     $f->_read_frames_into_cache;
     
     is join(' ', grep { length $_ } sort keys %{$f->_cached_frames_for_channel}),
-       '11',
+       '11 42',
        'cached frames exist for first read frame';
+
+    my $frame = frame(2, 'Net::AMQP::Protocol::Channel::OpenOk');
+    ok $f->frame_is($frame, ''),
+        'OpenOK compares OK against empty value';
+
+    ok $f->frame_is($frame, 'Channel::OpenOk'),
+        'OpenOk compares OK against right value';
+
+    ok !$f->frame_is($frame, 'Channel::Open'),
+        'OpenOk does not compare against wrong value';
+    
+    ok $f->next_frame_is(2, ''),
+        'next_frame with empty value is true';
+    
+    ok !$f->next_frame_is(2, 'Channel::Open'),
+        'next_frame (2) is not a Channel::Open';
+    
+    ok $f->next_frame_is(11, 'Channel::Open'),
+        'next_frame (11) is a Channel::Open';
+    
+    dies_ok { $f->read(7) } 'reading an empty channel fails';
+    
+    lives_ok { $f->read(11) } 'reading a filled channel succeeds';
+
+    dies_ok { $f->read(11) } 're-reading a previously filled channel fails';
+    
+    undef $frame;
+    lives_ok { $frame = $f->read(42, 'Channel::OpenOk') }
+        'reading a frame with typecheck succeeds';
+    
+    isa_ok $frame, 'Net::AMQP::Frame';
 }
+
+note 'packet writing';
+{
+    my $f = frameio();
+    
+    $f->write(12, 'Exchange::Declare');
+    
+    ok length $TestNetwork::write_buffer > 0,
+        'bytes written';
+}
+
+# print ref Net::AMQP::Protocol::Channel::Open->new->frame_wrap->method_frame;
 
 # diagnostics:
 # print ord . ' ' for split //, packet(42, 'Net::AMQP::Protocol::Channel::OpenOk');
@@ -50,15 +94,19 @@ sub frameio {
     return Net::RabbitMQ::PP::FrameIO->new(network => TestNetwork->new);
 }
 
-# construct a raw Net::AMQP::Protocol::Xxx::Yyy packet as string
-sub packet {
+sub frame {
     my $channel = shift;
-    my $type = shift;
+    my $type    = shift;
     
     my $frame = $type->new(@_)->frame_wrap;
     $frame->channel($channel);
     
-    return $frame->to_raw_frame;
+    return $frame;
+}
+
+# construct a raw Net::AMQP::Protocol::Xxx::Yyy packet as string
+sub packet {
+    return frame(@_)->to_raw_frame;
 }
 
 {
