@@ -11,7 +11,7 @@ our $VHOST = "test_$$";
 # sudo -k ; sudo -H -n -u rabbitmq rabbitmqctl list_vhosts
 
 if (!user_can_switch_to_rabbitmq()) {
-    plan skip_all => 'cannot become rabbitmq user, test impossible';
+    plan skip_all => 'cannot become rabbitmq user via su without password, test impossible';
 }
 
 add_vhost();
@@ -32,12 +32,15 @@ sub user_can_switch_to_rabbitmq {
 }
 
 sub delete_vhost {
-    rabbitmqctl('delete_vhost $VHOST');
+    rabbitmqctl("delete_user $VHOST");
+    rabbitmqctl("delete_vhost $VHOST");
 }
 
 sub add_vhost {
     delete_vhost();
-    rabbitmqctl('add_vhost $VHOST');
+    rabbitmqctl("add_vhost $VHOST");
+    rabbitmqctl("add_user $VHOST $VHOST");
+    rabbitmqctl("set_permissions -p $VHOST $VHOST '.*' '.*' '.*'")
 }
 
 sub rabbitmqctl {
