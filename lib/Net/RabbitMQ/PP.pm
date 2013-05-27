@@ -23,16 +23,18 @@ Net::RabbitMQ::PP - a pure perl RabbitMQ binding
     
     my $broker = Net::RabbitMQ::PP->new;
     
-    # TODO: work with exchanges
-    my $exchange = $broker->exchange('xxx');
-    #### MORE
+    # work with exchanges
+    my $exchange = $broker->exchange('thumbnail');
+    $exchange->declare;
     
-    # TODO: work with queues
-    my $queue = $broker->queue('xxx');
-    #### MORE
+    # work with queues
+    my $queue = $broker->queue('thumbnail');
+    $queue->declare;
+    $queue->bind(exchange => 'thumbnail', routing_key => '#.render');
     
     # open a channel for further operations
     my $channel = $broker->open_channel(1);
+    ### TODO: $channel = $broker->channel(1); ### does this make sense?
     
     # a producer
     $channel->publish(

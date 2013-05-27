@@ -22,7 +22,7 @@ sub message_definition {
             message  => 'Queue::Declare',
             fields   => {
                 queue       => $self->name,
-                durable     => 0,
+                durable     => 1,
                 passive     => 0,
                 exclusive   => 0, 
                 auto_delete => 0, 

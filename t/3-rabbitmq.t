@@ -2,6 +2,8 @@ use strict;
 use warnings;
 use Test::More;
 
+use ok 'Net::RabbitMQ::PP';
+
 our $VHOST = "test_$$";
 
 # test against a test-<<PID>> vhost of a running rabbitmq instance
@@ -14,11 +16,17 @@ if (!user_can_switch_to_rabbitmq()) {
     plan skip_all => 'cannot become rabbitmq user via su without password, test impossible';
 }
 
+note "Adding vhost $VHOST";
 add_vhost();
 
-# add queue
-# add exchange
-# add binding
+my $broker = Net::RabbitMQ::PP->new(virtual_host => $VHOST, debug => 1);
+
+my $exchange = $broker->exchange('thumbnail');
+$exchange->declare;
+
+my $queue = $broker->queue('thumbnail');
+$queue->declare;
+$queue->bind(exchange => 'thumbnail', routing_key => '#.render');
 
 # add message
 # get message
