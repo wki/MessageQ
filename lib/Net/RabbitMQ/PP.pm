@@ -3,7 +3,10 @@ use Moose;
 use Net::RabbitMQ::PP::Network;
 use Net::RabbitMQ::PP::FrameIO;
 use Net::RabbitMQ::PP::Channel;
+use Net::RabbitMQ::PP::Queue;
+use Net::RabbitMQ::PP::Exchange;
 use Try::Tiny;
+use Carp;
 use namespace::autoclean;
 
 with 'Net::RabbitMQ::PP::Role::FrameIO';
@@ -225,7 +228,7 @@ sub disconnect {
 sub open_channel {
     my $self = shift;
     my $channel_nr = shift
-        or die 'need channel nr to open';
+        or carp 'need channel nr to open';
     
     $self->write_frame($channel_nr, 'Channel::Open');
     $self->read_frame($channel_nr, 'Channel::OpenOk');
@@ -238,18 +241,27 @@ sub open_channel {
 
 ### TODO: kein Reply abfragen wenn no-wait mit angegeben ist...
 
-### TODO: add these:
+sub queue {
+    my $self = shift;
+    my $name = shift
+        or carp 'queue name needed for accessing a queue';
+    
+    return Net::RabbitMQ::PP::Queue->new(
+        frameio => $self->frameio,
+        name    => $self->name;
+    );
+}
 
-# - exchange('name') --> returns ::Exchange instance
-#   exchange('name').declare(durable, type, passive, durable, no-wait, arguments);
-#   exchange('name').delete(if-unused, no-wait);
-#
-# - queue('name') --> returns ::Queue instance, allows querying message-count, consumer-count
-#   queue('name').declare(durable, passive, exclusive, auto-delete, no-wait, arguments);
-#   queue('name').bind(exchange, routing-key, no-wait, arguments);
-#   queue('name').unbind(exchange, routing-key, arguments);
-#   queue('name').purge(no-wait);
-#   queue('name').delete(if-unused, if-empty, no-wait);
+sub exchange {
+    my $self = shift;
+    my $name = shift
+        or carp 'exchange name needed for accessing an exchange';
+    
+    return Net::RabbitMQ::PP::Exchange->new(
+        frameio => $self->frameio,
+        name    => $self->name;
+    );
+}
 
 __PACKAGE__->meta->make_immutable;
 1;

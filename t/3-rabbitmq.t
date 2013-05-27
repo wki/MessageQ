@@ -16,7 +16,15 @@ if (!user_can_switch_to_rabbitmq()) {
 
 add_vhost();
 
+# add queue
+# add exchange
+# add binding
 
+# add message
+# get message
+
+# add 2 messages
+# get 2 messages
 
 # delete_vhost();
 
@@ -40,7 +48,8 @@ sub add_vhost {
     delete_vhost();
     rabbitmqctl("add_vhost $VHOST");
     rabbitmqctl("add_user $VHOST $VHOST");
-    rabbitmqctl("set_permissions -p $VHOST $VHOST '.*' '.*' '.*'")
+    rabbitmqctl("set_permissions -p $VHOST $VHOST '.*' '.*' '.*'");
+    rabbitmqctl("set_permissions -p $VHOST guest '.*' '.*' '.*'");
 }
 
 sub rabbitmqctl {
