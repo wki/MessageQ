@@ -13,6 +13,68 @@ has name => (
     required => 1,
 );
 
+sub message_definition {
+    my $self = shift;
+    
+    return {
+        declare => {
+            channel  => 0,
+            message  => 'Queue::Declare',
+            fields   => {
+                queue       => $self->name,
+                durable     => 0,
+                passive     => 0,
+                exclusive   => 0, 
+                auto_delete => 0, 
+                no_wait     => 0,
+            },
+            response => 'Queue::DeclareOk',
+            response_fields => [qw(message_count consumer_count)],
+        },
+        bind => {
+            channel => 0,
+            message => 'Queue::Bind',
+            fields  => {
+                queue       => $self->name,
+                exchange    => '', # must be given as arg
+                routing_key => '',
+                no_wait     => 0,
+            },
+            response => 'Queue::BindOk',
+        },
+        unbind => {
+            channel => 0,
+            message => 'Queue::Unbind',
+            fields  => {
+                queue       => $self->name,
+                exchange    => '', # must be given as arg
+                routing_key => '',
+            },
+            response => 'Queue::UnbindOk',
+        },
+        purge => {
+            channel => 0,
+            message => 'Queue::Purge',
+            fields  => {
+                queue   => $self->name,
+                no_wait => 0,
+            },
+            response => 'Queue::PurgeOk',
+        },
+        delete => {
+            channel => 0,
+            message => 'Queue::Delete',
+            fields  => {
+                queue     => $self->name,
+                if_unused => 0,
+                if_empty  => 0,
+                no_wait   => 0,
+            },
+            response => 'Queue::DeleteOk',
+        },
+    }
+}
+
 =head2 declare
 
 declare a queue
@@ -21,22 +83,8 @@ declare a queue
 
 sub declare {
     my $self = shift;
-    my %args = @_;
     
-    $self->write_frame(
-        0,
-        'Queue::Declare',
-        queue       => $self->name,
-        durable     => 0,
-        passive     => 0,
-        exclusive   => 0, 
-        auto_delete => 0, 
-        no_wait     => 0,
-        %args,
-    );
-    
-    my $declare_ok = $self->read_frame(0, 'Queue::DeclareOk');
-    # contains queue, message-count, consumer-count
+    $self->send_message(declare => @_)
 }
 
 =head2 bind
@@ -47,19 +95,8 @@ bind a queue to an exchange
 
 sub bind {
     my $self = shift;
-    my %args = @_;
     
-    $self->write_frame(
-        0,
-        'Queue::Bind',
-        queue       => $self->name,
-        exchange    => '', # must be given as arg
-        routing_key => '',
-        no_wait     => 0,
-        %args,
-    );
-    
-    $self->read_frame(0, 'Queue::BindOk');
+    $self->send_message(bind => @_);
 }
 
 =head2 unbind
@@ -70,18 +107,8 @@ unbind a queue from an exchange
 
 sub unbind {
     my $self = shift;
-    my %args = @_;
-    
-    $self->write_frame(
-        0,
-        'Queue::Unbind',
-        queue       => $self->name,
-        exchange    => '', # must be given as arg
-        routing_key => '',
-        %args,
-    );
-    
-    $self->read_frame(0, 'Queue::UnbindOk');
+
+    $self->send_message(unbind => @_);
 }
 
 =head2 purge
@@ -92,17 +119,8 @@ remove all messages from the queue
 
 sub purge {
     my $self = shift;
-    my %args = @_;
-    
-    $self->write_frame(
-        0,
-        'Queue::Purge',
-        queue   => $self->name,
-        no_wait => 0,
-        %args,
-    );
-    
-    $self->read_frame(0, 'Queue::PurgeOk');
+
+    $self->send_message(purge => @_);
 }
 
 =head2 delete
@@ -113,19 +131,8 @@ deletes a queue
 
 sub delete {
     my $self = shift;
-    my %args = @_;
-    
-    $self->write_frame(
-        0,
-        'Queue::Delete',
-        queue     => $self->name,
-        if_unused => 0,
-        if_empty  => 0,
-        no_wait   => 0,
-        %args,
-    );
-    
-    $self->read_frame(0, 'Queue::DeleteOk');
+
+    $self->send_message(delete => @_);
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -196,6 +196,7 @@ sub ensure_connected {
 
 before [qw(
     open_channel
+    queue exchange
 )] => sub { $_[0]->ensure_connected };
 
 =head2 disconnect
@@ -228,7 +229,7 @@ sub disconnect {
 sub open_channel {
     my $self = shift;
     my $channel_nr = shift
-        or carp 'need channel nr to open';
+        or croak 'need channel nr to open';
     
     $self->write_frame($channel_nr, 'Channel::Open');
     $self->read_frame($channel_nr, 'Channel::OpenOk');
@@ -244,22 +245,22 @@ sub open_channel {
 sub queue {
     my $self = shift;
     my $name = shift
-        or carp 'queue name needed for accessing a queue';
+        or croak 'queue name needed for accessing a queue';
     
     return Net::RabbitMQ::PP::Queue->new(
         frameio => $self->frameio,
-        name    => $self->name;
+        name    => $self->name,
     );
 }
 
 sub exchange {
     my $self = shift;
     my $name = shift
-        or carp 'exchange name needed for accessing an exchange';
+        or croak 'exchange name needed for accessing an exchange';
     
     return Net::RabbitMQ::PP::Exchange->new(
         frameio => $self->frameio,
-        name    => $self->name;
+        name    => $self->name,
     );
 }
 

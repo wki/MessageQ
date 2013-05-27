@@ -20,6 +20,47 @@ has is_consuming => (
     default => 0,
 );
 
+sub message_definition {
+    my $self = shift;
+    
+    return {
+        consume => {
+            channel  => $self->channel,
+            message  => 'Basic::Consume',
+            fields   => {
+                consumer_tag => '',
+                no_local     => 0,
+                no_ack       => 1,
+                exclusive    => 0,
+                ticket       => 0,
+                no_wait      => 0,
+            },
+            response => 'Exchange::ConsumeOk',
+            response_fields => ['consumer_tag'],
+        },
+        qos => {
+            channel => $self->channel,
+            message => 'Basic::Qos',
+            fields  => {
+                prefetch_size  => '',
+                prefetch_count => 0,
+                global         => 1,
+            },
+            response => 'Basic::QosOk',
+        },
+        cancel => {
+            channel => $self->channel,
+            message => 'Basic::Cancel',
+            fields  => {
+                consumer_tag => '',
+                no_wait      => 0,
+            },
+            response => 'Basic::CancelOk',
+        },
+    };
+}
+
+
 =head2 publish ( data => ..., fields => ..., header => { ... } )
 
 publish a message
@@ -128,24 +169,12 @@ receive() can be called to get any messages.
 
 sub consume {
     my $self = shift;
-    my %args = @_;
     
-    $self->write_frame(
-        $self->channel,
-        'Basic::Consume',
-        consumer_tag => '',
-        no_local     => 0,
-        no_ack       => 1,
-        exclusive    => 0,
-        ticket       => 0,
-        no_wait      => 0,
-        %args,
-    );
-    my $consume_ok = $self->read_frame($self->channel, 'Basic::ConsumeOk');
-
+    my $reply = $self->send_message(consume => @_);
+    
     $self->is_consuming(1);
     
-    return $consume_ok->method_frame->{consumer_tag};
+    return $reply->{consumer_tag};
 }
 
 =head2 receive
@@ -173,17 +202,8 @@ specify quality of service
 
 sub qos {
     my $self = shift;
-    my %args = @_;
     
-    $self->write_frame(
-        $self->channel,
-        'Basic::Qos',
-        prefetch_size  => '',
-        prefetch_count => 0,
-        global         => 1,
-        %args,
-    );
-    $self->read_frame($self->channel, 'Basic::QosOk');
+    $self->send_message(qos => @_);
 }
 
 =head2 cancel
@@ -194,17 +214,9 @@ cancel a consumer
 
 sub cancel {
     my $self = shift;
-    my %args = @_;
     
-    $self->write_frame(
-        $self->channel,
-        'Basic::Cancel',
-        consumer_tag => '',
-        no_wait      => 0,
-        %args,
-    );
-    $self->read_frame($self->channel, 'Basic::CancelOk');
-
+    $self->send_message(cancel => @_);
+    
     $self->is_consuming(0);
 }
 

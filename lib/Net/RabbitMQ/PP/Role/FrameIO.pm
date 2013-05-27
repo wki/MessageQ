@@ -1,5 +1,6 @@
 package Net::RabbitMQ::PP::Role::FrameIO;
 use Moose::Role;
+use Carp;
 
 has frame_io => (
     is         => 'ro',
@@ -14,6 +15,37 @@ has frame_io => (
         next_frame_is  => 'next_frame_is',
     }
 );
+
+sub send_message {
+    my $self    = shift;
+    my $message = shift;
+    
+    my $message_definition = $self->message_definition->{$message}
+        or croak "Unable to send message '$message': not defined";
+    
+    my %args = ( %{$message_definition->{fields}}, @_ );
+    
+    $self->write_frame(
+        $message_definition->{channel},
+        $message_definition->{message},
+        %args,
+    );
+    
+    return if exists $message_definition->{fields}->{no_wait} && $args{no_wait};
+    
+    my $response = $self->read_frame(
+        $message_definition->{channel},
+        $message_definition->{response}
+    );
+    
+    my $response_fields = $message_definition->{response_fields} // [];
+    return if !scalar @$response_fields;
+    
+    return {
+        map { ($_ => $response->method_frame->$_) } 
+        @$response_fields
+    };
+}
 
 no Moose::Role;
 1;
