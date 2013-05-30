@@ -6,10 +6,11 @@ use namespace::autoclean;
 
 with 'Net::RabbitMQ::PP::Role::Broker';
 
-has is_consuming => (
-    is      => 'rw',
-    isa     => 'Bool',
-    default => 0,
+has consumer_tag => (
+    is        => 'rw',
+    isa       => 'Any',
+    predicate => 'is_consuming',
+    clearer   => 'finished_consuming',
 );
 
 sub message_definition {
@@ -21,12 +22,11 @@ sub message_definition {
             fields   => {
                 consumer_tag => '',
                 no_local     => 0,
-                no_ack       => 1,
+                no_ack       => 0,
                 exclusive    => 0,
-                ticket       => 0,
                 no_wait      => 0,
             },
-            response => 'Exchange::ConsumeOk',
+            response => 'Basic::ConsumeOk',
             response_fields => ['consumer_tag'],
         },
         qos => {
@@ -102,7 +102,7 @@ sub get {
     $self->write_frame(
         $self->channel_nr,
         'Basic::Get',
-        no_ack => 1,
+        no_ack => 0,
         %args,
     );
     
@@ -117,10 +117,7 @@ sub get {
 
 sub _read_response {
     my $self = shift;
-    my $deliver_frame = shift;
-    
-    # deliver occurs when we are consuming...
-    # my $deliver = $self->read_frame($self->channel_nr, 'Basic::Deliver');
+    my $deliver_frame = shift // $self->read_frame($self->channel_nr, 'Basic::Deliver');
 
     my $header  = $self->read_frame($self->channel_nr, 'Frame::Header');
     
@@ -156,7 +153,7 @@ sub consume {
     
     my $reply = $self->send_message(consume => @_);
     
-    $self->is_consuming(1);
+    $self->consumer_tag($reply->{consumer_tag});
     
     return $reply->{consumer_tag};
 }
@@ -199,9 +196,9 @@ cancel a consumer
 sub cancel {
     my $self = shift;
     
-    $self->send_message(cancel => @_);
+    $self->send_message(cancel => consumer_tag => $self->consumer_tag, @_);
     
-    $self->is_consuming(0);
+    $self->finished_consuming;
 }
 
 # TODO: flow(active)

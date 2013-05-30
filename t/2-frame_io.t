@@ -33,7 +33,7 @@ note 'packet decoding and reading';
     $TestNetwork::read_buffer = $packet1. $packet2;
     
     ok !scalar keys %{$f->_cached_frames_for_channel}, 'no frames in cache';
-    $f->_read_frames_into_cache;
+    $f->_read_frames_into_cache(11);
     
     is join(' ', grep { length $_ } sort keys %{$f->_cached_frames_for_channel}),
        '11',

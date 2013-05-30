@@ -36,21 +36,21 @@ has _cached_frames_for_channel => (
 
 sub cache_frame {
     my $self    = shift;
-    my $channel = shift;
+    my $channel = shift // 0;
     
     push @{$self->_cached_frames_for_channel->{$channel}}, @_;
 }
 
 sub has_cached_frames {
     my $self    = shift;
-    my $channel = shift;
+    my $channel = shift // 0;
     
     return scalar @{$self->_cached_frames_for_channel->{$channel} //= []};
 }
 
 sub get_cached_frame {
     my $self    = shift;
-    my $channel = shift;
+    my $channel = shift // 0;
     
     return shift @{$self->_cached_frames_for_channel->{$channel}};
 }
@@ -224,7 +224,8 @@ sub _read_frames_into_cache {
     ### Could this be harmful?
     return if $self->has_cached_frames($channel);
 
-    my $data = $self->_read_data;
+    my $data = $self->_read_data
+        or return;
     my @frames = Net::AMQP->parse_raw_frames(\$data);
     
     foreach my $frame (@frames) {

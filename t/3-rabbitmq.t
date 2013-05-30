@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Test::Exception;
 
 use ok 'Net::RabbitMQ::PP';
 
@@ -42,6 +43,7 @@ $queue->bind(exchange => 'thumbnail', routing_key => '#.render');
 
 note 'message handling';
 {
+    # publish and get a single message
     my $channel = $broker->channel(42);
     
     is $channel->get(queue => 'render'), undef, 'get returns undef if queue is empty';
@@ -53,6 +55,30 @@ note 'message handling';
     is $message->body, 'foo42', 'sent data is returned';
     
     $message->ack;
+    
+    is $channel->get(queue => 'render'), undef, 'get returns undef after queue is cleared';
+    
+    # publish 2 messages, consume and stop after 2 messages read
+    $channel->publish(data => 'msg01', exchange => 'thumbnail', routing_key => 'bar.render');
+    $channel->publish(data => 'msg02', exchange => 'thumbnail', routing_key => 'bar.render');
+    
+    dies_ok { $channel->receive } 'receive on a non-consuming channel fails';
+    
+    my $consumer_tag = $channel->consume(queue => 'render', consumer_tag => 'xxxbar');
+    is $consumer_tag, 'xxxbar', 'consumer tag returned by consume command';
+    
+    my $m1 = $channel->receive;
+    is $m1->body, 'msg01', 'message 1 body is returned';
+    $m1->ack;
+    
+    my $m2 = $channel->receive;
+    is $m2->body, 'msg02', 'message 2 body is returned';
+    $m2->ack;
+    
+    $channel->cancel;
+    dies_ok { $channel->receive } 'receive on a no-more-consuming channel fails';
+
+    is $channel->get(queue => 'render'), undef, 'all messages are consumed';
 }
 
 done_testing;
