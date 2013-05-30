@@ -19,26 +19,45 @@ if (!user_can_switch_to_rabbitmq()) {
 note "Adding vhost $VHOST";
 add_vhost();
 
-my $broker = Net::RabbitMQ::PP->new(virtual_host => $VHOST, debug => 1);
+my $broker = Net::RabbitMQ::PP->new(virtual_host => $VHOST, debug => 0);
 
+note 'channel handling';
+{
+    my $c27_1 = $broker->channel(27);
+    my $c27_2 = $broker->channel(27);
+    
+    is $c27_1, $c27_2, 'successive channel() calls yield the same object';
+    is $c27_1->channel_nr, 27, 'channel_nr reported right';
+    is $c27_1->broker, $broker, 'broker reported right';
+}
+
+note 'declaring exchange thumbnail';
 my $exchange = $broker->exchange('thumbnail');
-$exchange->declare;
+$exchange->declare(type => 'topic');
 
-my $queue = $broker->queue('thumbnail');
+note 'declaring queue render';
+my $queue = $broker->queue('render');
 $queue->declare;
 $queue->bind(exchange => 'thumbnail', routing_key => '#.render');
 
-# add message
-# get message
+note 'message handling';
+{
+    my $channel = $broker->channel(42);
+    
+    is $channel->get(queue => 'render'), undef, 'get returns undef if queue is empty';
 
-# add 2 messages
-# get 2 messages
-
-# delete_vhost();
-
-ok 1==1;
+    $channel->publish(data => 'foo42', exchange => 'thumbnail', routing_key => 'bar.render');
+    
+    my $message = $channel->get(queue => 'render');
+    isa_ok $message, 'Net::RabbitMQ::PP::Message';
+    is $message->body, 'foo42', 'sent data is returned';
+    
+    $message->ack;
+}
 
 done_testing;
+
+END { delete_vhost() }
 
 sub user_can_switch_to_rabbitmq {
     system 'sudo -k 2>/dev/null';
@@ -48,6 +67,8 @@ sub user_can_switch_to_rabbitmq {
 }
 
 sub delete_vhost {
+    return if !user_can_switch_to_rabbitmq();
+
     rabbitmqctl("delete_user $VHOST");
     rabbitmqctl("delete_vhost $VHOST");
 }

@@ -3,11 +3,11 @@ use Moose;
 use Try::Tiny;
 use namespace::autoclean;
 
-with 'Net::RabbitMQ::PP::Role::FrameIO';
+with 'Net::RabbitMQ::PP::Role::Broker';
 
 has name => (
-    is => 'ro',
-    isa => 'Str',
+    is       => 'ro',
+    isa      => 'Str',
     required => 1,
 );
 
@@ -16,11 +16,10 @@ sub message_definition {
     
     return {
         declare => {
-            channel  => 0,
             message  => 'Exchange::Declare',
             fields   => {
                 exchange => $self->name,
-                type     => '',
+                type     => 'direct',
                 passive  => 0,
                 durable  => 1,
             },
@@ -28,12 +27,11 @@ sub message_definition {
             response_fields => [],
         },
         delete => {
-            channel  => 0,
             message  => 'Exchange::Delete',
             fields   => {
-                exchange    => $self->name,
-                if_unused   => 0,
-                no_wait     => 0,
+                exchange  => $self->name,
+                if_unused => 0,
+                no_wait   => 0,
             },
             response => 'Exchange::DeleteOk',
             response_fields => [],

@@ -3,7 +3,7 @@ use Moose;
 use Try::Tiny;
 use namespace::autoclean;
 
-with 'Net::RabbitMQ::PP::Role::FrameIO';
+with 'Net::RabbitMQ::PP::Role::Broker';
 
 # TODO: does it make sense to have accessors for message-count, consumer-count
 
@@ -18,7 +18,6 @@ sub message_definition {
     
     return {
         declare => {
-            channel  => 0,
             message  => 'Queue::Declare',
             fields   => {
                 queue       => $self->name,
@@ -32,7 +31,6 @@ sub message_definition {
             response_fields => [qw(message_count consumer_count)],
         },
         bind => {
-            channel => 0,
             message => 'Queue::Bind',
             fields  => {
                 queue       => $self->name,
@@ -43,7 +41,6 @@ sub message_definition {
             response => 'Queue::BindOk',
         },
         unbind => {
-            channel => 0,
             message => 'Queue::Unbind',
             fields  => {
                 queue       => $self->name,
@@ -53,7 +50,6 @@ sub message_definition {
             response => 'Queue::UnbindOk',
         },
         purge => {
-            channel => 0,
             message => 'Queue::Purge',
             fields  => {
                 queue   => $self->name,
@@ -62,7 +58,6 @@ sub message_definition {
             response => 'Queue::PurgeOk',
         },
         delete => {
-            channel => 0,
             message => 'Queue::Delete',
             fields  => {
                 queue     => $self->name,

@@ -4,15 +4,7 @@ use Data::Dumper;
 use Net::RabbitMQ::PP::Message;
 use namespace::autoclean;
 
-with 'Net::RabbitMQ::PP::Role::FrameIO';
-
-### TODO: instead of frame_io: have a 'broker' attr, responding to all frame_io methods
-
-has channel => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-);
+with 'Net::RabbitMQ::PP::Role::Broker';
 
 has is_consuming => (
     is      => 'rw',
@@ -25,7 +17,6 @@ sub message_definition {
     
     return {
         consume => {
-            channel  => $self->channel,
             message  => 'Basic::Consume',
             fields   => {
                 consumer_tag => '',
@@ -39,7 +30,6 @@ sub message_definition {
             response_fields => ['consumer_tag'],
         },
         qos => {
-            channel => $self->channel,
             message => 'Basic::Qos',
             fields  => {
                 prefetch_size  => '',
@@ -49,7 +39,6 @@ sub message_definition {
             response => 'Basic::QosOk',
         },
         cancel => {
-            channel => $self->channel,
             message => 'Basic::Cancel',
             fields  => {
                 consumer_tag => '',
@@ -60,8 +49,7 @@ sub message_definition {
     };
 }
 
-
-=head2 publish ( data => ..., fields => ..., header => { ... } )
+=head2 publish ( exchange => 'foo', data => ..., other_fields => ..., header => { ... } )
 
 publish a message
 
@@ -78,17 +66,15 @@ sub publish {
     my $header = delete $args{header};
     
     $self->write_frame(
-        $self->channel,
+        $self->channel_nr,
         'Basic::Publish',
         mandatory => 0,
         immediate => 0,
-        ticket    => 0,
         %args,
     );
     
     $self->write_header(
-        $self->channel,
-        weight    => 0,
+        $self->channel_nr,
         body_size => length $data,
         header    => $header // {},
     );
@@ -98,7 +84,7 @@ sub publish {
     #  in the Tune/TuneOk frames during connection
     my @chunks = unpack '(a30000)*', $data;
     
-    $self->write_body($self->channel, $_) for @chunks;
+    $self->write_body($self->channel_nr, $_) for @chunks;
 }
 
 =head2 get ( queue => 'queue', ... )
@@ -113,45 +99,43 @@ sub get {
     my $self = shift;
     my %args = @_;
     
-    die 'not implemented';
-    
     $self->write_frame(
-        $self->channel,
+        $self->channel_nr,
         'Basic::Get',
         no_ack => 1,
-        ticket => 0,
         %args,
     );
     
-    return if $self->next_frame_is($self->channel, 'Basic::GetEmpty');
+    if ($self->next_frame_is($self->channel_nr, 'Basic::GetEmpty')) {
+        $self->read_frame($self->channel_nr);
+        return;
+    }
     
-    my $get_ok = $self->read_frame($self->channel, 'Basic::GetOK')
-        or return;
-    
-    return $self->_read_response;
+    my $get_ok = $self->read_frame($self->channel_nr, 'Basic::GetOk');
+    return $self->_read_response($get_ok);
 }
 
 sub _read_response {
     my $self = shift;
+    my $deliver_frame = shift;
     
-    my $deliver = $self->read_frame($self->channel, 'Basic::Deliver');
-    print 'DELIVER:', Dumper $deliver;
-    my $header  = $self->read_frame($self->channel, 'Frame::Header');
-    print 'HEADER:', Dumper $header;
+    # deliver occurs when we are consuming...
+    # my $deliver = $self->read_frame($self->channel_nr, 'Basic::Deliver');
+
+    my $header  = $self->read_frame($self->channel_nr, 'Frame::Header');
     
     my $body = '';
     while (length $body < $header->body_size) {
-        my $frame = $self->read_frame($self->channel, 'Frame::Body');
-        print Dumper $frame;
+        my $frame = $self->read_frame($self->channel_nr, 'Frame::Body');
         
         $body .= $frame->payload;
     }
     
     return Net::RabbitMQ::PP::Message->new(
-        channel        => $self->channel,
+        channel_nr     => $self->channel_nr,
         frame_io       => $self->frame_io,
         body           => $body,
-        delivery_tag   => $deliver->method_frame->delivery_tag,
+        delivery_tag   => $deliver_frame->method_frame->delivery_tag,
         reply_to       => $header->header_frame->headers->{reply_to},
         correlation_id => $header->header_frame->headers->{correlation_id},
     );
@@ -222,6 +206,14 @@ sub cancel {
 
 # TODO: flow(active)
 # TODO: close(reply-code, reply-text, class-id, method-id)
+
+sub close {
+    my $self = shift;
+    
+    # ... do more.
+    
+    $self->broker->_mark_channel_closed($self->channel_nr);
+}
 
 
 ### ASYNC Model?

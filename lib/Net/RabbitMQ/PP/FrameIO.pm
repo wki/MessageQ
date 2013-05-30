@@ -114,7 +114,7 @@ sub _write_frame {
     my $self  = shift;
     my $frame = shift;
 
-    $self->print_debug(1, 'Writing Frame:',
+    $self->print_debug(1, 'Writing Frame (' . $frame->channel . ') ',
         $frame->can('method_frame')
             ? ref $frame->method_frame
             : ref $frame
@@ -222,21 +222,20 @@ sub _read_frames_into_cache {
     my $channel = shift;
 
     ### Could this be harmful?
-    # return if $self->has_cached_frames($channel);
+    return if $self->has_cached_frames($channel);
 
-    while (my $data = $self->_read_data) {
-        my @frames = Net::AMQP->parse_raw_frames(\$data);
+    my $data = $self->_read_data;
+    my @frames = Net::AMQP->parse_raw_frames(\$data);
+    
+    foreach my $frame (@frames) {
+        $self->print_debug(1, "Caching Frame (${\$frame->channel}):",
+            $frame->can('method_frame')
+                ? ref $frame->method_frame
+                : ref $frame
+        );
+        $self->print_debug(2, "Frame:", Dumper $frame);
         
-        foreach my $frame (@frames) {
-            $self->print_debug(1, "Caching Frame (${\$frame->channel}):",
-                $frame->can('method_frame')
-                    ? ref $frame->method_frame
-                    : ref $frame
-            );
-            $self->print_debug(2, "Frame:", Dumper $frame);
-        }
-        
-        $self->cache_frame($_->channel, $_) for @frames;
+        $self->cache_frame($frame->channel, $frame);
     }
 }
 

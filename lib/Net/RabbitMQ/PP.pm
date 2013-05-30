@@ -128,7 +128,7 @@ sub _build_network {
     );
 }
 
-# frame_io defined by role above
+# frame_io defined by role FrameIO
 sub _build_frame_io {
     my $self = shift;
     
@@ -137,6 +137,17 @@ sub _build_frame_io {
         debug   => $self->debug,
     );
 }
+
+has _opened_channels => (
+    traits  => ['Hash'],
+    is      => 'rw',
+    isa     => 'HashRef',
+    default => sub { +{} },
+    handles => {
+        _clear_opened_channels => 'clear',
+        _mark_channel_closed   => 'delete',
+    }
+);
 
 =head2 connect
 
@@ -197,7 +208,7 @@ sub ensure_connected {
 }
 
 before [qw(
-    open_channel
+    channel
     queue exchange
 )] => sub { $_[0]->ensure_connected };
 
@@ -217,18 +228,27 @@ sub disconnect {
     
     $self->clear_frame_io;
     $self->clear_network;
+    $self->_clear_opened_channels;
     
     $self->is_connected(0);
 }
 
-=head2 open_channel ( $nr )
+=head2 channel ( $i )
 
-### TODO: channel(x) ---> liefert (gecachtes) Channel Object. Macht Sinn?
-### $x->channel(2)->publish(...);
+opens a channel unless already open and returns the Channel object for the
+given channel_nr
 
 =cut
 
-sub open_channel {
+sub channel {
+    my $self = shift;
+    my $channel_nr = shift
+        or croak 'need channel nr to open';
+    
+    return $self->_opened_channels->{$channel_nr} //= $self->_open_channel($channel_nr);
+}
+
+sub _open_channel {
     my $self = shift;
     my $channel_nr = shift
         or croak 'need channel nr to open';
@@ -237,12 +257,10 @@ sub open_channel {
     $self->read_frame($channel_nr, 'Channel::OpenOk');
     
     return Net::RabbitMQ::PP::Channel->new(
-        frame_io => $self->frame_io,
-        channel  => $channel_nr,
+        broker     => $self,
+        channel_nr => $channel_nr,
     );
 }
-
-### TODO: kein Reply abfragen wenn no-wait mit angegeben ist...
 
 sub queue {
     my $self = shift;
@@ -250,8 +268,10 @@ sub queue {
         or croak 'queue name needed for accessing a queue';
     
     return Net::RabbitMQ::PP::Queue->new(
-        frameio => $self->frameio,
-        name    => $self->name,
+        broker     => $self,
+        channel_nr => $self->channel(1)->channel_nr, # ensures channel is open
+        name       => $name,
+        @_
     );
 }
 
@@ -259,10 +279,12 @@ sub exchange {
     my $self = shift;
     my $name = shift
         or croak 'exchange name needed for accessing an exchange';
-    
+
     return Net::RabbitMQ::PP::Exchange->new(
-        frameio => $self->frameio,
-        name    => $self->name,
+        broker     => $self,
+        channel_nr => $self->channel(1)->channel_nr, # ensures channel is open
+        name       => $name,
+        @_
     );
 }
 

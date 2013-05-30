@@ -36,7 +36,7 @@ note 'packet decoding and reading';
     $f->_read_frames_into_cache;
     
     is join(' ', grep { length $_ } sort keys %{$f->_cached_frames_for_channel}),
-       '11 42',
+       '11',
        'cached frames exist for first read frame';
 
     my $frame = frame(2, 'Net::AMQP::Protocol::Channel::OpenOk');

@@ -4,14 +4,6 @@ use namespace::autoclean;
 
 with 'Net::RabbitMQ::PP::Role::FrameIO';
 
-### TODO: instead of frame_io: have a 'broker' attr, responding to all frame_io methods
-
-has channel => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-);
-
 has body => (
     is       => 'ro',
     isa      => 'Any',
@@ -26,13 +18,13 @@ has delivery_tag => (
 
 has reply_to => (
     is       => 'ro',
-    isa      => 'Str',
+    isa      => 'Maybe[Str]',
     required => 1,
 );
 
 has correlation_id => (
     is       => 'ro',
-    isa      => 'Str',
+    isa      => 'Maybe[Str]',
     required => 1,
 );
 
@@ -47,7 +39,7 @@ sub ack {
     my %args = @_;
     
     $self->write_frame(
-        $self->channel,
+        $self->channel_nr,
         'Basic::Ack',
         multiple     => 0,
         delivery_tag => $self->delivery_tag,

@@ -16,6 +16,12 @@ has frame_io => (
     }
 );
 
+has channel_nr => (
+    is      => 'ro',
+    isa     => 'Int',
+    default => 1,
+);
+
 sub send_message {
     my $self    = shift;
     my $message = shift;
@@ -26,7 +32,7 @@ sub send_message {
     my %args = ( %{$message_definition->{fields}}, @_ );
     
     $self->write_frame(
-        $message_definition->{channel},
+        $self->channel_nr,
         $message_definition->{message},
         %args,
     );
@@ -34,7 +40,7 @@ sub send_message {
     return if exists $message_definition->{fields}->{no_wait} && $args{no_wait};
     
     my $response = $self->read_frame(
-        $message_definition->{channel},
+        $self->channel_nr,
         $message_definition->{response}
     );
     
