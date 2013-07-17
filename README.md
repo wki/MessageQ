@@ -32,3 +32,5 @@ Reveiver:
 Implementation:
 
 ![Class Diagram](Net__RabbitMQ__PP.png)
+
+![Class Diagram](MessageQ.png)
