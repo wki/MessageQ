@@ -28,3 +28,7 @@ Reveiver:
     while (my $message = $m->recv) {
         # so something with $message->data
     }
+
+Implementation:
+
+![Class Diagram](Net__RabbitMQ__PP.png)
