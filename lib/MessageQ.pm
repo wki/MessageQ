@@ -87,7 +87,7 @@ sub _build_broker {
         host     => $self->host,
         user     => $self->user,
         password => $self->password,
-        debug    => 1,
+        # debug    => 1,
     );
 
     $broker->connect;
@@ -96,15 +96,15 @@ sub _build_broker {
 }
 
 has channel => (
-    is => 'ro',
-    isa => 'Object',
+    is         => 'ro',
+    isa        => 'Object',
     lazy_build => 1,
 );
 
 sub _build_channel {
     my $self = shift;
     
-    return $self->broker->open_channel(1);
+    return $self->broker->channel(1);
 }
 
 =head1 METHODS

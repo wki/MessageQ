@@ -54,9 +54,10 @@ option C<<< no_ack => 0 >>> set.
 sub ack {
     my $self = shift;
     
-    $self->channel->ack(
-        delivery_tag => $self->raw_message->{delivery_tag},
-    );
+    $self->raw_message->ack;
+    # $self->channel->ack(
+    #     delivery_tag => $self->raw_message->{delivery_tag},
+    # );
 }
 
 =head2 reject

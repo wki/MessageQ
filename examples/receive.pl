@@ -18,6 +18,9 @@ $m->consume($queue, { no_ack => 0 });
 say "[*] listening for messages on '$queue'...";
 
 while (my $message = $m->receive(0)) {
+    # my $i = $message->data->{argv};
+    # say "received: $i" if $i % 500 == 0;
+    
     say Data::Dumper->Dump([$message->data], ['received_data']);
 
     # if we had consume('proof', { no_ack => 0 }), we need:

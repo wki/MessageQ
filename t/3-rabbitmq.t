@@ -74,6 +74,17 @@ note 'message handling';
     my $m2 = $channel->receive;
     is $m2->body, 'msg02', 'message 2 body is returned';
     $m2->ack;
+
+    # payload 1K ... 1M
+    foreach my $size (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024) {
+        my $data = join '', map { chr(32 + rand(64)) } (1 .. $size * 1024);
+
+        $channel->publish(data => $data, exchange => 'thumbnail', routing_key => 'bar.render');
+        
+        my $m1 = $channel->receive;
+        is $m1->body, $data, "$size KB random message is OK";
+        $m1->ack;
+    }
     
     $channel->cancel;
     dies_ok { $channel->receive } 'receive on a no-more-consuming channel fails';
