@@ -10,7 +10,9 @@ has file => (
 sub process {
     my $self = shift;
     
-    say "Thumbnail: FILE = ${\$self->file}";
+    say "Thumbnail: PID=$$, FILE='${\$self->file}'";
+    
+    die 'stop for testing';
 }
 
 __PACKAGE__->meta->make_immutable;

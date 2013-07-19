@@ -12,4 +12,4 @@ use MessageQ;
 my $m = MessageQ->new(user => 'worker', password => 'worker');
 
 my $command = shift @ARGV or die 'no command given';
-$m->delegate(render => $command, { @ARGV } );
+$m->delegate('render', 'de-DE.render', $command, { @ARGV } );

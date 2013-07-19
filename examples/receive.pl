@@ -17,24 +17,12 @@ $m->consume($queue, { no_ack => 0 });
 
 say "[*] listening for messages on '$queue'...";
 
-while (my $message = $m->re cv) {
+while (my $message = $m->receive(0)) {
+    # my $i = $message->data->{argv};
+    # say "received: $i" if $i % 500 == 0;
+    
     say Data::Dumper->Dump([$message->data], ['received_data']);
 
-    # if we had consume('proof', { no_ack => 0 }), we need:
+    # if we have consume('proof', { no_ack => 0 }), we need:
     $message->ack;
 }
-
-__END__
-
-Alternative receiver:
-
-use Data::Dumper;
-use Net::Thumper;
-
-my $m = Net::Thumper->new(server => "localhost", amqp_definition => "amqp0-9-1.xml");
-$m->connect;
-$m->open_channel();
-my $c = $m->consume("render");
-my $msg = $m->receive();
-
-say Dumper $msg;

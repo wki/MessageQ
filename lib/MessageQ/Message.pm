@@ -16,14 +16,10 @@ MessageQ::Message - represents a message
 
 =cut
 
-has messager => (
+has channel => (
     is       => 'ro',
-    isa      => 'MessageQ',
+    isa      => 'Object',
     required => 1,
-    handles  => [
-        'broker',
-        'channel_nr',
-    ],
 );
 
 has raw_message => (
@@ -58,11 +54,10 @@ option C<<< no_ack => 0 >>> set.
 sub ack {
     my $self = shift;
     
-    $self->broker->ack(
-        $self->channel_nr,
-        $self->raw_message->{delivery_tag},
-    );
+    $self->raw_message->ack(@_);
 }
+
+### FIXME: is reject/return neccesary? or is one negative method sufficient?
 
 =head2 reject
 
@@ -71,11 +66,19 @@ sub ack {
 sub reject {
     my $self = shift;
     
-    $self->broker->reject(
-        $self->channel_nr,
-        $self->raw_message->{delivery_tag},
-    );
+    $self->raw_message->reject(@_);
 }
+
+=head2 return ( $error_text )
+
+returns a message to an error queue
+
+=cut
+
+sub return ( $error_text ) {
+    
+}
+
 
 =head1 AUTHOR
 

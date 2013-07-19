@@ -1,7 +1,7 @@
 Simple MessageQ based on Net::RabbitMQ
 ======================================
 
-Sender:
+Producer:
 
     use MessageQ;
     
@@ -11,9 +11,9 @@ Sender:
         password => 'worker',
     );
     
-    $m->publish(queue_name => { message => 'structure', with => 'info' });
+    $m->publish(exchange_name => { some => 'structure', with => 'info' });
 
-Reveiver:
+Consumer:
 
     use MessageQ;
     
@@ -23,8 +23,17 @@ Reveiver:
         password => 'worker',
     );
     
-    $m->consume('queue_name');
+    $m->consume('queue_name', no_ack => 0);
     
-    while (my $message = $m->recv) {
+    while (my $message = $m->receive) {
         # so something with $message->data
+        
+        # no_ack => 0 means: a message needs an ack()
+        $message->ack;
     }
+
+Implementation:
+
+![Class Diagram](Net__RabbitMQ__PP.png)
+
+![Class Diagram](MessageQ.png)

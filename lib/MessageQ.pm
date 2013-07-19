@@ -3,11 +3,12 @@ use 5.010;
 use Moose;
 use JSON::XS;
 use Sys::Hostname;
-use Net::RabbitMQ;
+use File::ShareDir ':ALL';
+use Path::Class;
+use Try::Tiny;
+use Net::RabbitMQ::PP;
 use MessageQ::Message;
 use namespace::autoclean;
-
-with 'MessageQ::Role::LoginAttributes';
 
 =head1 NAME
 
@@ -50,57 +51,51 @@ MessageQ - simple message exchange using a RabbitMQ backend
 
 =cut
 
+has connect_options => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    default => sub { +{} },
+);
+
 has broker => (
     is         => 'ro',
-    isa        => 'Net::RabbitMQ',
+    isa        => 'Object',
     lazy_build => 1,
 );
 
 sub _build_broker {
     my $self = shift;
 
-    my $broker = Net::RabbitMQ->new;
-    $broker->connect(
-        $self->host,
-        {
-            user     => $self->user,
-            password => $self->password,
-        }
-    );
+    my $broker = Net::RabbitMQ::PP->new($self->connect_options);
+    $broker->connect;
 
     return $broker;
 }
 
-has channel_nr => (
+has channel => (
     is         => 'ro',
-    isa        => 'Int',
+    isa        => 'Object',
     lazy_build => 1,
-    init_arg   => undef,
 );
 
-sub _build_channel_nr {
+sub _build_channel {
     my $self = shift;
-    state $channel_nr = 0;
-
-    ++$channel_nr;
-    $self->broker->channel_open($channel_nr);
-
-    return $channel_nr;
+    
+    return $self->broker->channel(1);
 }
-
-has _queues => (
-    traits  => ['Hash'],
-    is      => 'ro',
-    isa     => 'HashRef',
-    default => sub { {} },
-    handles => {
-        has_queue => 'exists',
-    }
-);
 
 =head1 METHODS
 
 =cut
+
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    
+    return $class->$orig(
+        connect_options => ref $_[0] eq 'HASH' ? $_[0] : { @_ }
+    );
+};
 
 sub DEMOLISH {
     my $self = shift;
@@ -108,35 +103,26 @@ sub DEMOLISH {
     $self->broker->disconnect;
 }
 
-=head2 publish ( $routing_key, \%data [ , \%options [ , \%props ] ] )
-
-publish a message (typically as hashref). Options and props are the same
-as Net::RabbitMQ's args. If no $options->{exchange} key is given, or the
-value is 'amq.direct' or empty, a queue with the name of the $routing_key
-is created unless already existing.
+=head2 publish ( $exchange, $routing_key, \%data [ , \%options ] )
 
 =cut
 
 sub publish {
     my $self        = shift;
+    my $exchange    = shift;
     my $routing_key = shift;
     my $data        = shift;
-    my $options     = shift // {};
-    my $props       = shift // {};
+    my %options     = @_;
 
-    if (!exists $options->{exchange} || ($options->{exchange} // 'amq.direct') eq 'amq.direct') {
-        $self->ensure_queue_exists($routing_key);
-    }
-
-    $self->broker->publish(
-        $self->channel_nr,
-        $routing_key,
-        encode_json($data),
-        $options, $props
+    $self->channel->publish(
+        exchange => $exchange,
+        routing_key => $routing_key,
+        data => encode_json($data),
+        %options
     );
 }
 
-=head2 delegate ( $queue_name, $command, \%data )
+=head2 delegate ( $exchange, $routing_key, $command, \%data )
 
 publishes a command for getting executed by a client. The command is assumed
 to be part of a package name for obtaining and instantiating an executable
@@ -145,10 +131,10 @@ object at the remote side.
 =cut
 
 sub delegate {
-    my ($self, $queue_name, $command, $data) = @_;
+    my ($self, $exchange, $routing_key, $command, $data) = @_;
     
     $self->publish(
-        $queue_name,
+        $exchange, $routing_key,
         {
             command => $command,
             data    => $data,
@@ -156,34 +142,34 @@ sub delegate {
     );
 }
 
-=head2 ensure_queue_exists ( $queue [, \%options ] )
-
-creates a queue if not yet existing
-
-=cut
-
-sub ensure_queue_exists {
-    my $self = shift;
-    my $queue_name = shift;
-    my %options = (
-        passive     => 0,
-        durable     => 1,
-        auto_delete => 0,
-        exclusive   => 0,
-
-        ref $_[0] eq 'HASH' ? %{$_[0]} : @_
-    );
-
-    return if $self->has_queue($queue_name);
-
-    $self->broker->queue_declare(
-        $self->channel_nr,
-        $queue_name,
-        \%options,
-    );
-
-    $self->_queues->{$queue_name} = 1;
-}
+# =head2 ensure_queue_exists ( $queue [, \%options ] )
+# 
+# creates a queue if not yet existing
+# 
+# =cut
+# 
+# sub ensure_queue_exists {
+#     my $self = shift;
+#     my $queue = shift;
+#     my %options = (
+#         passive     => 0,
+#         durable     => 1,
+#         auto_delete => 0,
+#         exclusive   => 0,
+# 
+#         ref $_[0] eq 'HASH' ? %{$_[0]} : @_
+#     );
+# 
+#     return if $self->has_queue($queue_name);
+# 
+#     $self->broker->queue_declare(
+#         $self->channel_nr,
+#         $queue_name,
+#         \%options,
+#     );
+# 
+#     $self->_queues->{$queue_name} = 1;
+# }
 
 =head2 consume ( $queue [, \%options ] )
 
@@ -204,8 +190,8 @@ start a consumer on the given queue. Valid options are:
 =cut
 
 sub consume {
-    my $self = shift;
-    my $queue_name = shift;
+    my $self    = shift;
+    my $queue   = shift;
     my %options = (
         consumer_tag => "${\hostname}_$$",
         no_local     => 0,
@@ -215,30 +201,36 @@ sub consume {
         ref $_[0] eq 'HASH' ? %{$_[0]} : @_
     );
 
-    $self->ensure_queue_exists($queue_name);
+    # $self->ensure_queue_exists($queue_name);
 
-    $self->broker->consume(
-        $self->channel_nr,
-        $queue_name,
-        \%options
+    $self->channel->consume(
+        queue => $queue,
+        %options
     );
 }
 
-=head2 recv ( $queue )
+=head2 receive ( $timeout )
 
 read one message from the given queue. Will block until a message is present,
 returns C<undef> then server is down
 
+FIXME: timeout is currently ignored.
+
 =cut
 
-sub recv {
-    my $self = shift;
+sub receive {
+    my $self    = shift;
+    my $timeout = shift // 0;
 
-    my $raw_message = $self->broker->recv
-        or return;
+    my $raw_message = $self->channel->receive;
+    
+    if (!$raw_message) {
+        warn 'receive: timeout reached...';
+        return;
+    }
 
     return MessageQ::Message->new(
-        messager    => $self,
+        channel     => $self->channel,
         raw_message => $raw_message,
     );
 }
