@@ -23,6 +23,6 @@ while (my $message = $m->receive(0)) {
     
     say Data::Dumper->Dump([$message->data], ['received_data']);
 
-    # if we had consume('proof', { no_ack => 0 }), we need:
+    # if we have consume('proof', { no_ack => 0 }), we need:
     $message->ack;
 }

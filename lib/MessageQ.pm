@@ -10,8 +10,6 @@ use Net::RabbitMQ::PP;
 use MessageQ::Message;
 use namespace::autoclean;
 
-with 'MessageQ::Role::LoginAttributes';
-
 =head1 NAME
 
 MessageQ - simple message exchange using a RabbitMQ backend
@@ -53,26 +51,11 @@ MessageQ - simple message exchange using a RabbitMQ backend
 
 =cut
 
-# has amqp_definition => (
-#     is         => 'ro',
-#     isa        => 'Str',
-#     lazy_build => 1,
-# );
-# 
-# sub _build_amqp_definition {
-#     my $self;
-#     
-#     my $dist_dir;
-#     try {
-#         $dist_dir = dir(dist_dir('MessageQ'));
-#     } catch {
-#         $dist_dir = file(__FILE__)->absolute->dir->parent->subdir('share');
-#     };
-#     
-#     # warn "DIST dir = '$dist_dir'";
-#     
-#     return $dist_dir->file('amqp0-9-1.xml')->stringify;
-# }
+has connect_options => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    default => sub { +{} },
+);
 
 has broker => (
     is         => 'ro',
@@ -83,13 +66,7 @@ has broker => (
 sub _build_broker {
     my $self = shift;
 
-    my $broker = Net::RabbitMQ::PP->new(
-        host     => $self->host,
-        user     => $self->user,
-        password => $self->password,
-        # debug    => 1,
-    );
-
+    my $broker = Net::RabbitMQ::PP->new($self->connect_options);
     $broker->connect;
 
     return $broker;
@@ -111,13 +88,22 @@ sub _build_channel {
 
 =cut
 
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    
+    return $class->$orig(
+        connect_options => ref $_[0] eq 'HASH' ? $_[0] : { @_ }
+    );
+};
+
 sub DEMOLISH {
     my $self = shift;
     
     $self->broker->disconnect;
 }
 
-=head2 publish ( $exchange, $routing_key, \%data [ , \%options [ , \%props ] ] )
+=head2 publish ( $exchange, $routing_key, \%data [ , \%options ] )
 
 =cut
 
@@ -136,25 +122,25 @@ sub publish {
     );
 }
 
-# =head2 delegate ( $queue_name, $command, \%data )
-# 
-# publishes a command for getting executed by a client. The command is assumed
-# to be part of a package name for obtaining and instantiating an executable
-# object at the remote side.
-# 
-# =cut
-# 
-# sub delegate {
-#     my ($self, $queue_name, $command, $data) = @_;
-#     
-#     $self->publish(
-#         $queue_name,
-#         {
-#             command => $command,
-#             data    => $data,
-#         }
-#     );
-# }
+=head2 delegate ( $exchange, $routing_key, $command, \%data )
+
+publishes a command for getting executed by a client. The command is assumed
+to be part of a package name for obtaining and instantiating an executable
+object at the remote side.
+
+=cut
+
+sub delegate {
+    my ($self, $exchange, $routing_key, $command, $data) = @_;
+    
+    $self->publish(
+        $exchange, $routing_key,
+        {
+            command => $command,
+            data    => $data,
+        }
+    );
+}
 
 # =head2 ensure_queue_exists ( $queue [, \%options ] )
 # 
@@ -164,7 +150,7 @@ sub publish {
 # 
 # sub ensure_queue_exists {
 #     my $self = shift;
-#     my $queue_name = shift;
+#     my $queue = shift;
 #     my %options = (
 #         passive     => 0,
 #         durable     => 1,
@@ -204,8 +190,8 @@ start a consumer on the given queue. Valid options are:
 =cut
 
 sub consume {
-    my $self = shift;
-    my $queue_name = shift;
+    my $self    = shift;
+    my $queue   = shift;
     my %options = (
         consumer_tag => "${\hostname}_$$",
         no_local     => 0,
@@ -218,7 +204,7 @@ sub consume {
     # $self->ensure_queue_exists($queue_name);
 
     $self->channel->consume(
-        queue => $queue_name,
+        queue => $queue,
         %options
     );
 }
@@ -228,10 +214,12 @@ sub consume {
 read one message from the given queue. Will block until a message is present,
 returns C<undef> then server is down
 
+FIXME: timeout is currently ignored.
+
 =cut
 
 sub receive {
-    my $self = shift;
+    my $self    = shift;
     my $timeout = shift // 0;
 
     my $raw_message = $self->channel->receive;

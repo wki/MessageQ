@@ -5,8 +5,6 @@ use MessageQ;
 use Try::Tiny;
 use namespace::autoclean;
 
-with 'MessageQ::Role::LoginAttributes';
-
 =head1 NAME
 
 MessageQ::Worker - a worker handling delegated messages
@@ -18,8 +16,10 @@ MessageQ::Worker - a worker handling delegated messages
     my $w = MessageQ::Worker->new(
         user        => 'worker',
         password    => 'worker,
-        queue       => 'image',
+        # for more options: see MessageQ
+        
         search_path => 'My::Worker',
+        queue       => 'image',
     );
 
     $w->work;
@@ -38,20 +38,10 @@ C<user>, C<password> and optionally C<host> attributes.
 =cut
 
 has mq => (
-    is         => 'ro',
-    isa        => 'MessageQ',
-    lazy_build => 1,
+    is       => 'ro',
+    isa      => 'MessageQ',
+    required => 1,
 );
-
-sub _build_mq {
-    my $self = shift;
-
-    return MessageQ->new(
-        host     => $self->host,
-        user     => $self->user,
-        password => $self->password,
-    );
-}
 
 =head2 search_path
 
@@ -81,6 +71,18 @@ has queue => (
 
 =cut
 
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    
+    my $opts = ref $_[0] eq 'HASH' ? $_[0] : { @_ };
+    
+    return $class->$orig(
+        mq => MessageQ->new($opts),
+        %$opts
+    );
+};
+
 =head2 work
 
 start a loop waiting and processing messages.
@@ -90,14 +92,21 @@ start a loop waiting and processing messages.
 sub work {
     my $self = shift;
 
+    # FIXME: should we loop around this entire method to force reconnect?
+
     $self->mq->consume($self->queue, { no_ack => 0 });
 
-    while (my $message = $self->mq->recv) {
+    while (my $message = $self->mq->receive) {
         my $data = $message->data;
 
+        if (!exists $data->{command}) {
+            warn "Message invalid, 'command' missing";
+            next;
+        }
+        
         try {
             say "execute $data->{command}";
-            $self->execute_work_child_process($data->{command}, $data->{data});
+            $self->execute_work_process($data->{command}, $data->{data});
             $message->ack;
         } catch {
             warn "job died: $data->{command} ($_)";
@@ -106,14 +115,14 @@ sub work {
     }
 }
 
-=head2 execute_work_child_process ( $class, \%data )
+=head2 execute_work_process ( $class, \%data )
 
 executes a freshly constructed object of the given class with some data
 in a new process
 
 =cut
 
-sub execute_work_child_process {
+sub execute_work_process {
     my ($self, $class, $data) = @_;
 
     my $pid = fork;

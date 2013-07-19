@@ -12,7 +12,7 @@ use MessageQ;
 my $exchange    = shift @ARGV or die '1st argument must be EXCHANGE';
 my $routing_key = shift @ARGV or die '2nd argument must be ROUTING.KEY';
 
-my $m = MessageQ->new(user => 'worker', password => 'worker');
+my $m = MessageQ->new(user => 'worker', password => 'worker', debug => 1);
 
 $m->publish(
     $exchange,

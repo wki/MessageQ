@@ -54,11 +54,10 @@ option C<<< no_ack => 0 >>> set.
 sub ack {
     my $self = shift;
     
-    $self->raw_message->ack;
-    # $self->channel->ack(
-    #     delivery_tag => $self->raw_message->{delivery_tag},
-    # );
+    $self->raw_message->ack(@_);
 }
+
+### FIXME: is reject/return neccesary? or is one negative method sufficient?
 
 =head2 reject
 
@@ -67,10 +66,19 @@ sub ack {
 sub reject {
     my $self = shift;
     
-    $self->channel->reject(
-        $self->raw_message->{delivery_tag},
-    );
+    $self->raw_message->reject(@_);
 }
+
+=head2 return ( $error_text )
+
+returns a message to an error queue
+
+=cut
+
+sub return ( $error_text ) {
+    
+}
+
 
 =head1 AUTHOR
 
