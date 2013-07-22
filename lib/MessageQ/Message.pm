@@ -75,7 +75,7 @@ returns a message to an error queue
 
 =cut
 
-sub return ( $error_text ) {
+sub return {
     
 }
 
