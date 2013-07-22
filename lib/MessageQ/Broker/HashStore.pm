@@ -1,12 +1,13 @@
 package MessageQ::Broker::HashStore;
 use Carp;
 use Moose;
+use MessageQ::Broker::HashStoreQueue;
 use namespace::autoclean;
 
 extends 'MessageQ::Broker';
 
-# queue => [ messages ]
-has messages_for_queue => (
+# queue_name => HashStoreQueue
+has queue_for => (
     is      => 'rw',
     isa     => 'HashRef',
     default => sub { +{} },
@@ -14,7 +15,7 @@ has messages_for_queue => (
 
 has consuming_queue => (
     is        => 'rw',
-    isa       => 'Str',
+    isa       => 'MessageQ::Broker::HashStoreQueue',
     predicate => 'is_consuming',
 );
 
@@ -30,6 +31,18 @@ MessageQ::Broker::HashStore - a dummy broker just good enough for testing
 
 =cut
 
+=head2 queue
+
+returns a queue object for a given queue name
+
+=cut
+
+sub queue {
+    my ($self, $queue_name) = @_;
+    
+    $self->queue_for->{$queue_name} //= MessageQ::Broker::HashStoreQueue->new();
+}
+
 =head2 publish ( $destination, \%data )
 
 =cut
@@ -39,7 +52,7 @@ sub publish {
     
     # strip off everything after first colon to get a clean queue name
     $destination =~ s{:.*\z}{}xms;
-    push @{$self->messages_for_queue->{$destination}}, $data;
+    $self->queue($destination)->add_message($data);
 }
 
 =head2 consume ( $queue )
@@ -51,7 +64,7 @@ tell the queue that this process wants to consume it
 sub consume {
     my ($self, $queue) = @_;
     
-    $self->consuming_queue($queue);
+    $self->consuming_queue($self->queue($queue));
 }
 
 =head2 receive
@@ -70,9 +83,13 @@ sub receive {
     croak 'not consuming to a queue -- receive not allowed'
         if !$self->is_consuming;
     
-    ### wrong: must give back a message Object.
+    my $data = $self->consuming_queue->[0]
+        or return;
     
-    return shift @{$self->messages_for_queue->{$self->consuming_queue}};
+    return MessageQ::Broker::HashStoreMessage->new(
+        queue => $self->consuming_queue,
+        data  => $data,
+    );
 }
 
 =head2 has_message
@@ -87,9 +104,7 @@ sub has_message {
     croak 'not consuming to a queue -- has_message not allowed'
         if !$self->is_consuming;
     
-    return if !exists $self->messages_for_queue->{$self->consuming_queue};
-    
-    return scalar @{$self->messages_for_queue->{$self->consuming_queue}};
+    return $selc->consuming_queue->has_messages;
 }
 
 __PACKAGE__->meta->make_immutable;

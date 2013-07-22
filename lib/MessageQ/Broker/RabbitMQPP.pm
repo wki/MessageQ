@@ -99,7 +99,7 @@ sub receive {
     
     my $response = $self->channel->receive;
     
-    return MessageQ::Broker::RabbitMQPP::Message->new(
+    return MessageQ::Broker::RabbitMQPPMessage->new(
         channel => $self->channel,
         data    => $response,
     );

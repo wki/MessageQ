@@ -1,11 +1,12 @@
-package MessageQ::Message;
-use Carp;
+package MessageQ::Broker::RabbitMQPPMessage;
 use Moose;
 use namespace::autoclean;
 
+extends 'MessageQ::Message';
+
 =head1 NAME
 
-MessageQ::Message - abstract base class for a Message
+MessageQ::Broker::RabbitMQPPMessage - a message for RabbitMQPP broker
 
 =head1 SYNOPSIS
 
@@ -15,15 +16,11 @@ MessageQ::Message - abstract base class for a Message
 
 =cut
 
-has data => (
-    is       => 'ro',
-    isa      => 'Any',
-    required => 1,
-);
-
 =head1 METHODS
 
 =cut
+
+### channel ?
 
 =head2 ack
 
@@ -44,6 +41,9 @@ sub reject {
     croak 'method "reject" not implemented'
 }
 
+__PACKAGE__->meta->make_immutable;
+1;
+
 =head1 AUTHOR
 
 Wolfgang Kinkeldei, E<lt>wolfgang@kinkeldei.deE<gt>
@@ -54,6 +54,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-
-__PACKAGE__->meta->make_immutable;
-1;

@@ -1,11 +1,12 @@
-package MessageQ::Message;
-use Carp;
+package MessageQ::Broker::HashStoreMessage;
 use Moose;
 use namespace::autoclean;
 
+extends 'MessageQ::Message';
+
 =head1 NAME
 
-MessageQ::Message - abstract base class for a Message
+MessageQ::Broker::RabbitMQPPMessage - a message for HashStore broker
 
 =head1 SYNOPSIS
 
@@ -15,15 +16,15 @@ MessageQ::Message - abstract base class for a Message
 
 =cut
 
-has data => (
-    is       => 'ro',
-    isa      => 'Any',
-    required => 1,
-);
-
 =head1 METHODS
 
 =cut
+
+has queue => (
+    is       => 'ro',
+    isa      => 'MessageQ::Broker::HashStoreQueue',
+    required => 1,
+);
 
 =head2 ack
 
@@ -33,7 +34,9 @@ option C<<< no_ack => 0 >>> set.
 =cut
 
 sub ack {
-    croak 'method "ack" not implemented'
+    my $self = shift;
+    
+    $self->queue->get_message;
 }
 
 =head2 reject
@@ -41,8 +44,11 @@ sub ack {
 =cut
 
 sub reject {
-    croak 'method "reject" not implemented'
+    # do nothing -- next request will re-read the message again
 }
+
+__PACKAGE__->meta->make_immutable;
+1;
 
 =head1 AUTHOR
 
@@ -54,6 +60,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-
-__PACKAGE__->meta->make_immutable;
-1;
