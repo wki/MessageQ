@@ -13,12 +13,18 @@ MessageQ - simple message exchange using a RabbitMQ backend
     use MessageQ;
     
     my $m = MessageQ->new(
-        host     => 'localhost',
-        user     => 'worker',
-        password => 'worker',
+        connect_options => {
+            host     => 'localhost',
+            user     => 'worker',
+            password => 'worker',
+        },
+        broker_class => 'RabbitMQPP', # MessageQ::Broker::RabbitMQPP
     );
     
     $m->publish(queue_name => { message => 'structure', with => 'info' });
+    
+    # additional info (RabbitMQ: routing key) appended to queue name
+    $m->publish('render:proof.de_DE' => { ... });
 
 
     # reveiver:
@@ -26,16 +32,22 @@ MessageQ - simple message exchange using a RabbitMQ backend
     use MessageQ;
     
     my $m = MessageQ->new(
-        host     => 'localhost',
-        user     => 'worker',
-        password => 'worker',
+        connect_options => {
+            host     => 'localhost',
+            user     => 'worker',
+            password => 'worker',
+        },
     );
     
     $m->consume('queue_name');
     
     while (my $message = $m->receive) {
-        # so something with $message->data
+        # do something with $message->data
+        
+        $message->ack; # or $message->reject;
     }
+    
+    # if we reach this point the connection got torn down
 
 =head1 DESCRIPTION
 
@@ -70,6 +82,7 @@ has broker => (
 sub _build_broker {
     my $self = shift;
     
+    # TODO: check if prefix with 'MessageQ::Broker::' makes sense.
     require $self->broker_class;
 
     my $broker = $self->broker_class->new($self->connect_options);
