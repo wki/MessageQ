@@ -1,6 +1,7 @@
 package MessageQ::Broker::HashStore;
 use Carp;
 use Moose;
+use MessageQ::Broker::HashStoreMessage;
 use MessageQ::Broker::HashStoreQueue;
 use namespace::autoclean;
 
@@ -83,7 +84,7 @@ sub receive {
     croak 'not consuming to a queue -- receive not allowed'
         if !$self->is_consuming;
     
-    my $data = $self->consuming_queue->[0]
+    my $data = $self->consuming_queue->first_message
         or return;
     
     return MessageQ::Broker::HashStoreMessage->new(
@@ -104,7 +105,7 @@ sub has_message {
     croak 'not consuming to a queue -- has_message not allowed'
         if !$self->is_consuming;
     
-    return $selc->consuming_queue->has_messages;
+    return $self->consuming_queue->has_messages;
 }
 
 __PACKAGE__->meta->make_immutable;

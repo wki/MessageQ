@@ -1,5 +1,7 @@
 package MessageQ;
 use Moose;
+use Module::Load;
+use Try::Tiny;
 use namespace::autoclean;
 
 =head1 NAME
@@ -62,10 +64,9 @@ has connect_options => (
 );
 
 has broker_class => (
-    is       => 'ro',
-    isa      => 'Str',
-    required => 1,
-    default  => 'MessageQ::Broker::RabbitMQPP',
+    is      => 'ro',
+    isa     => 'Str',
+    default => 'MessageQ::Broker::RabbitMQPP',
 );
 
 has broker => (
@@ -82,12 +83,25 @@ has broker => (
 sub _build_broker {
     my $self = shift;
     
-    # TODO: check if prefix with 'MessageQ::Broker::' makes sense.
-    require $self->broker_class;
-
-    my $broker = $self->broker_class->new($self->connect_options);
-    $broker->connect;
-
+    my $c = $self->broker_class;
+    my $broker;
+    
+    foreach my $class ($c, "MessageQ::Broker::$c") {
+        # warn "trying '$class'...";
+        
+        try {
+            load $class or die "not loaable: $class";
+            $broker = $class->new($self->connect_options);
+            $broker->connect;
+            warn "load success: $class";
+        } catch {
+            # warn "loading '$class' failed: $_";
+            undef $broker;
+        }
+    }
+    
+    die "Could not find requested broker '$c'" if !$broker;
+    
     return $broker;
 }
 
@@ -95,19 +109,19 @@ sub _build_broker {
 
 =cut
 
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    
-    return $class->$orig(
-        connect_options => ref $_[0] eq 'HASH' ? $_[0] : { @_ }
-    );
-};
+# around BUILDARGS => sub {
+#     my $orig  = shift;
+#     my $class = shift;
+#     
+#     return $class->$orig(
+#         connect_options => ref $_[0] eq 'HASH' ? $_[0] : { @_ }
+#     );
+# };
 
 sub DEMOLISH {
     my $self = shift;
     
-    $self->disconnect;
+    $self->disconnect if $self->has_broker;
 }
 
 =head1 AUTHOR

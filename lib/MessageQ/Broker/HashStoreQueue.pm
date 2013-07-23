@@ -24,12 +24,25 @@ has messages => (
     isa     => 'ArrayRef',
     default => sub { [] },
     handles => {
+        nr_messages  => 'count',
         has_messages => 'count',
         is_empty     => 'is_empty',
         add_message  => 'push',
         get_message  => 'shift',
     }
 );
+
+=head1 METHODS
+
+=cut
+
+=head2 first_message
+
+return the first message, undef if no messages present
+
+=cut
+
+sub first_message { $_[0]->messages->[0] }
 
 __PACKAGE__->meta->make_immutable;
 1;
