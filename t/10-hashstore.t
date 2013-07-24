@@ -9,7 +9,7 @@ my $h = MessageQ::Broker::HashStore->new;
 
 $h->publish(thumbnail => { file => '/x.jpg' });
 $h->publish(render => { file => '/x.tex' });
-$h->publish(render => { file => '/y.tex' });
+$h->publish('render:xxx' => { file => '/y.tex' });
 
 is scalar keys %{$h->queue_for},
     2,

@@ -20,10 +20,10 @@ MessageQ - simple message exchange using a RabbitMQ backend
             user     => 'worker',
             password => 'worker',
         },
-        broker_class => 'RabbitMQPP', # MessageQ::Broker::RabbitMQPP
+        broker_class => 'RabbitMQPP', # means: MessageQ::Broker::RabbitMQPP
     );
     
-    $m->publish(queue_name => { message => 'structure', with => 'info' });
+    $m->publish(destination => { message => 'structure', with => 'info' });
     
     # additional info (RabbitMQ: routing key) appended to queue name
     $m->publish('render:proof.de_DE' => { ... });
@@ -87,36 +87,23 @@ sub _build_broker {
     my $broker;
     
     foreach my $class ($c, "MessageQ::Broker::$c") {
-        # warn "trying '$class'...";
-        
         try {
-            load $class or die "not loaable: $class";
+            load $class;
             $broker = $class->new($self->connect_options);
             $broker->connect;
-            warn "load success: $class";
         } catch {
-            # warn "loading '$class' failed: $_";
             undef $broker;
-        }
+        };
+        
+        return $broker if $broker;
     }
     
-    die "Could not find requested broker '$c'" if !$broker;
-    
-    return $broker;
+    die "Could not find requested broker '$c'";
 }
 
 =head1 METHODS
 
 =cut
-
-# around BUILDARGS => sub {
-#     my $orig  = shift;
-#     my $class = shift;
-#     
-#     return $class->$orig(
-#         connect_options => ref $_[0] eq 'HASH' ? $_[0] : { @_ }
-#     );
-# };
 
 sub DEMOLISH {
     my $self = shift;
